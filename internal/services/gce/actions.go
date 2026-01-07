@@ -3,8 +3,10 @@ package gce
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rk/tgcp/internal/utils"
 )
 
 // Action messages
@@ -42,11 +44,34 @@ func (s *Service) StopInstanceCmd(instance Instance) tea.Cmd {
 }
 
 // SSHCmd constructs the gcloud ssh command
-// Note: In Bubbletea, interactive exec requires Tea.Exec, but for simple MVP
-// we might just print the command or try to run it detached.
-// For a terminal app, we usually pause the TUI, run SSH, then resume.
 func (s *Service) SSHCmd(instance Instance) tea.Cmd {
-	cmd := exec.Command("gcloud", "compute", "ssh", instance.Name, "--zone", instance.Zone, "--project", s.projectID)
+	// Build base arguments
+	args := []string{"compute", "ssh", instance.Name, "--zone", instance.Zone, "--project", s.projectID}
+
+	// Auto-detect IAP: If no external IP, use IAP tunnel
+	if instance.ExternalIP == "" {
+		args = append(args, "--tunnel-through-iap")
+	}
+
+	// Check for Tmux
+	if utils.IsTmux() {
+		return func() tea.Msg {
+			// Construct the full command string for tmux
+			fullCmd := fmt.Sprintf("gcloud %s", strings.Join(args, " "))
+
+			// Tmux split-window command
+			// -h for horizontal split
+			cmd := exec.Command("tmux", "split-window", "-h", fullCmd)
+
+			if err := cmd.Run(); err != nil {
+				return actionResultMsg{err: fmt.Errorf("Tmux split failed: %w", err)}
+			}
+			return actionResultMsg{msg: "Opened SSH in new pane"}
+		}
+	}
+
+	// Standard Full Screen SSH
+	cmd := exec.Command("gcloud", args...)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return actionResultMsg{err: fmt.Errorf("SSH failed: %w", err)}

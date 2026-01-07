@@ -287,6 +287,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					return s, s.SSHCmd(instances[idx])
 				}
+			case "l": // Logs
+				instances := s.getCurrentInstances()
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
+					inst := instances[idx]
+					filter := fmt.Sprintf(`resource.type="gce_instance" AND resource.labels.instance_id="%s"`, inst.ID)
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
+				}
 			}
 			// Forward to table
 			s.table, cmd = s.table.Update(msg)

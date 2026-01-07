@@ -320,6 +320,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						s.viewState = ViewDetail
 					}
 				}
+			case "l": // Logs
+				if s.activeTab == TabServices {
+					svcs := s.services
+					if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
+						svc := svcs[idx]
+						filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, svc.Name)
+						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
+					}
+				}
 			}
 
 			if s.activeTab == TabServices {
@@ -328,6 +337,14 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.funcTable, cmd = s.funcTable.Update(msg)
 			}
 			return s, cmd
+		} else if s.viewState == ViewDetail {
+			switch msg.String() {
+			case "q", "esc":
+				s.viewState = ViewList
+				s.selectedService = nil
+				s.selectedFunc = nil
+				return s, nil
+			}
 		}
 	}
 
@@ -384,7 +401,8 @@ func (s *Service) renderDetailView() string {
 	svc := s.selectedService
 
 	// Title
-	title := styles.TitleStyle.Render(fmt.Sprintf("Cloud Run Service: %s", svc.Name))
+	// Title
+	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Run > Services > %s", svc.Name))
 
 	// Status
 	statusStyle := styles.SuccessStyle
@@ -420,7 +438,7 @@ func (s *Service) renderFuncDetailView() string {
 		return "No function selected"
 	}
 	f := s.selectedFunc
-	title := styles.TitleStyle.Render(fmt.Sprintf("Cloud Function: %s", f.Name))
+	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Run > Functions > %s", f.Name))
 
 	details := fmt.Sprintf(`
 %s %s

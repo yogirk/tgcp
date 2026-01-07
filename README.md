@@ -8,9 +8,10 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
 
 - **🚀 Fast Navigation**: Instant switching between services and views using keyboard shortcuts.
 - **🔐 Secure Authentication**: Uses Application Default Credentials (ADC) for seamless and secure login.
+- **🔀 Project Switcher**: Switch active projects at runtime using the Command Palette `:project switch`.
 - **⚡ Smart Caching**: Built-in caching layer to reduce API calls and improve responsiveness.
 - **☁️ Supported Services**:
-    - **Compute Engine (GCE)**: List instances, view details, start/stop instances, SSH.
+    - **Compute Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration (splits Tmux pane automatically).
     - **Cloud SQL**: Monitor database instances, check status and configurations, start/stop.
     - **IAM**: Audit service accounts and policies.
     - **Cloud Run**: List services, view revisions, and explore **Cloud Functions** in a dedicated tab.
@@ -57,6 +58,17 @@ TGCP uses **Application Default Credentials (ADC)** to authenticate with Google 
 Run the application:
 ```bash
 ./tgcp
+```
+
+### Configuration
+
+TGCP supports a configuration file at `~/.tgcprc` (YAML format).
+
+**Example `~/.tgcprc`:**
+```yaml
+project: "my-default-project"
+ui:
+  sidebar_visible: true
 ```
 
 ### CLI Options

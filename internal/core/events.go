@@ -10,3 +10,8 @@ type StatusMsg struct {
 
 // LastUpdatedMsg updates the "Last Updated" timestamp
 type LastUpdatedMsg time.Time
+
+// SwitchToLogsMsg requests a context switch to the logging service
+type SwitchToLogsMsg struct {
+	Filter string
+}

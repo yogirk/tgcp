@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rk/tgcp/internal/styles"
 )
@@ -14,8 +16,11 @@ func (s *Service) renderDetailView() string {
 		return "No account selected"
 	}
 
+	// Breadcrumb
+	header := styles.SubtleStyle.Render(fmt.Sprintf("IAM > Service Accounts > %s", s.selectedAccount.DisplayName))
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
-		styles.HeaderStyle.Render("Service Account Details"),
+		header,
 		"",
 		fmtKeyVal("Display Name", s.selectedAccount.DisplayName),
 		fmtKeyVal("Email", s.selectedAccount.Email),

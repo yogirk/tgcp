@@ -32,7 +32,7 @@ func NewSidebar() SidebarModel {
 			{Name: "Cloud Run", ShortName: "run"},
 			{Name: "Cloud Storage", ShortName: "gcs"},
 			{Name: "BigQuery", ShortName: "bq"},
-			{Name: "Networking", ShortName: "net", IsComing: true},
+			{Name: "Networking", ShortName: "net"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start

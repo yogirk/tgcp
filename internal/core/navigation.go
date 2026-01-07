@@ -12,13 +12,14 @@ const (
 	ViewServiceList
 	ViewResourceDetail
 	ViewHelp
+	ViewProjectSwitcher
 )
 
 // Route represents a navigational destination
 type Route struct {
 	View    ViewType
 	Service string // e.g., "gce", "sql"
-	ID      string // resource ID
+	ID      string // resource ID or Project ID
 }
 
 // Command represents an actionable command in the palette
@@ -33,6 +34,7 @@ type NavigationModel struct {
 	CurrentRoute Route
 	History      []Route
 	Commands     []Command
+	BaseCommands []Command // Persist default commands
 
 	// Palette State
 	PaletteActive bool
@@ -42,10 +44,12 @@ type NavigationModel struct {
 }
 
 func NewNavigation() NavigationModel {
+	defaults := defaultCommands()
 	return NavigationModel{
 		CurrentRoute:  Route{View: ViewHome},
 		History:       make([]Route, 0),
-		Commands:      defaultCommands(),
+		Commands:      defaults,
+		BaseCommands:  defaults,
 		PaletteActive: false,
 		Suggestions:   []Command{},
 	}
@@ -53,6 +57,7 @@ func NewNavigation() NavigationModel {
 
 func defaultCommands() []Command {
 	return []Command{
+		{Name: "GCP: Switch Project", Description: "Switch active Google Cloud Project", Action: func() Route { return Route{View: ViewProjectSwitcher} }},
 		{Name: "Home", Description: "Go to Home Screen", Action: func() Route { return Route{View: ViewHome} }},
 		{Name: "GCE: List Instances", Description: "List Google Compute Engine VM instances", Action: func() Route { return Route{View: ViewServiceList, Service: "gce"} }},
 		{Name: "SQL: List Instances", Description: "List Cloud SQL instances", Action: func() Route { return Route{View: ViewServiceList, Service: "sql"} }},
@@ -60,8 +65,21 @@ func defaultCommands() []Command {
 		{Name: "Run: List Services", Description: "List Cloud Run Services", Action: func() Route { return Route{View: ViewServiceList, Service: "run"} }},
 		{Name: "GCS: List Buckets", Description: "List Cloud Storage Buckets", Action: func() Route { return Route{View: ViewServiceList, Service: "gcs"} }},
 		{Name: "Help", Description: "Show Help Screen", Action: func() Route { return Route{View: ViewHelp} }},
-		// Add more commands here (e.g., Refresh, Quit)
 	}
+}
+
+// SetCommands updates the available commands (e.g. for switching context)
+func (m *NavigationModel) SetCommands(cmds []Command) {
+	m.Commands = cmds
+	m.Selection = 0
+	m.FilterCommands("") // Reset filter
+}
+
+// RestoreBaseCommands resets to default commands
+func (m *NavigationModel) RestoreBaseCommands() {
+	m.Commands = m.BaseCommands
+	m.Selection = 0
+	m.FilterCommands("")
 }
 
 // FilterCommands updates suggestions based on input query

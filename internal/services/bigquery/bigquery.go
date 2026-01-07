@@ -300,10 +300,10 @@ func (s *Service) View() string {
 	if s.viewState == ViewDatasets {
 		return s.datasetTable.View()
 	} else if s.viewState == ViewTables {
-		header := styles.TitleStyle.Render(fmt.Sprintf("Dataset: %s", s.selectedDataset.ID))
+		header := styles.SubtleStyle.Render(fmt.Sprintf("BigQuery > Datasets > %s", s.selectedDataset.ID))
 		return lipgloss.JoinVertical(lipgloss.Left, header, s.tableTable.View())
 	} else if s.viewState == ViewSchema {
-		header := styles.TitleStyle.Render(fmt.Sprintf("Table: %s.%s", s.selectedDataset.ID, s.selectedTable.ID))
+		header := styles.SubtleStyle.Render(fmt.Sprintf("BigQuery > Datasets > %s > Tables > %s", s.selectedDataset.ID, s.selectedTable.ID))
 		return lipgloss.JoinVertical(lipgloss.Left, header, s.schemaTable.View())
 	}
 	return ""

@@ -282,7 +282,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						s.currentPrefix = ""
 						s.loading = true
 						return s, s.fetchObjectsCmd()
+						// s.viewState = ViewDetail // Not fully implemented for objects yet
 					}
+				}
+			case "l": // Logs
+				buckets := s.buckets
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(buckets) {
+					b := buckets[idx]
+					filter := fmt.Sprintf(`resource.type="gcs_bucket" AND resource.labels.bucket_name="%s"`, b.Name)
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
 				}
 			}
 			s.table, cmd = s.table.Update(msg)
@@ -363,7 +371,7 @@ func (s *Service) renderListView() string {
 }
 
 func (s *Service) renderObjectListView() string {
-	header := styles.TitleStyle.Render(fmt.Sprintf("Bucket: %s / %s", s.selectedBucket.Name, s.currentPrefix))
+	header := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s > %s", s.selectedBucket.Name, s.currentPrefix))
 	return lipgloss.JoinVertical(lipgloss.Left, header, s.objectTable.View())
 }
 
@@ -375,7 +383,8 @@ func (s *Service) renderDetailView() string {
 	b := s.selectedBucket
 
 	// Title
-	title := styles.TitleStyle.Render(fmt.Sprintf("Bucket: %s", b.Name))
+	// Title
+	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s", b.Name))
 
 	// Details
 	details := fmt.Sprintf(`

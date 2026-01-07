@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rk/tgcp/internal/config"
 	"github.com/rk/tgcp/internal/core"
 	"github.com/rk/tgcp/internal/services"
 	"github.com/rk/tgcp/internal/services/bigquery"
@@ -13,6 +14,8 @@ import (
 	"github.com/rk/tgcp/internal/services/gce"
 	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/iam"
+	"github.com/rk/tgcp/internal/services/logging"
+	"github.com/rk/tgcp/internal/services/net"
 	"github.com/rk/tgcp/internal/ui/components"
 )
 
@@ -58,10 +61,13 @@ type MainModel struct {
 	LastFocus     FocusArea
 	ShowHelp      bool
 	ActiveService string
+
+	// External Managers
+	ProjectManager *core.ProjectManager
 }
 
 // InitialModel returns the initial state of the application
-func InitialModel(authState core.AuthState) MainModel {
+func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 	// Initialize Cache
 	cache := core.NewCache()
 
@@ -110,16 +116,35 @@ func InitialModel(authState core.AuthState) MainModel {
 	}
 	svcMap["bq"] = bqSvc
 
+	// Create Networking Service
+	netSvc := net.NewService(cache)
+	if authState.ProjectID != "" {
+		netSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["net"] = netSvc
+
+	// Create Logging Service
+	logSvc := logging.NewService(cache)
+	if authState.ProjectID != "" {
+		logSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["logs"] = logSvc
+
+	// Initialize Components
+	sb := components.NewSidebar()
+	sb.Visible = cfg.UI.SidebarVisible
+
 	return MainModel{
-		AuthState:  authState,
-		Navigation: core.NewNavigation(),
-		Sidebar:    components.NewSidebar(),
-		HomeMenu:   components.NewHomeMenu(), // Added
-		StatusBar:  components.NewStatusBar(),
-		Palette:    components.NewPalette(), // Added
-		Focus:      FocusSidebar,
-		ViewMode:   ViewHome, // Start at Home
-		ServiceMap: svcMap,
+		AuthState:      authState,
+		Navigation:     core.NewNavigation(),
+		Sidebar:        sb,
+		HomeMenu:       components.NewHomeMenu(),
+		StatusBar:      components.NewStatusBar(),
+		Palette:        components.NewPalette(),
+		Focus:          FocusSidebar,
+		ViewMode:       ViewHome,
+		ServiceMap:     svcMap,
+		ProjectManager: core.NewProjectManager(cache),
 	}
 }
 
@@ -148,7 +173,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global Keybindings
 		if m.Focus != FocusPalette {
 			switch msg.String() {
-			case "q":
+			case "q", "esc":
 				if m.ShowHelp {
 					m.ShowHelp = false
 					return m, nil
@@ -197,9 +222,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.Focus = m.LastFocus
 				m.Navigation.PaletteActive = false
-				m.StatusBar.Mode = "NORMAL"
 				m.StatusBar.Message = "Ready"
-				m.Palette.TextInput.Reset() // Clear input
+				m.Palette.TextInput.Reset()        // Clear input
+				m.Navigation.RestoreBaseCommands() // Reset to default commands
 				m.Navigation.FilterCommands("")
 				return m, nil
 			case "up":
@@ -213,8 +238,43 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if route := m.Navigation.ExecuteSelection(); route != nil {
 					// Route Logic
 					if route.View == core.ViewHome {
-						m.ViewMode = ViewHome
-						m.Sidebar.Active = false
+						// Check for Project Switch
+						if len(route.ID) > 15 && route.ID[:15] == "SWITCH_PROJECT:" {
+							newProjectID := route.ID[15:]
+							m.AuthState.ProjectID = newProjectID
+
+							// Re-init Services
+							// Ideally we should have a ReinitAll method, but for now loop
+							for _, svc := range m.ServiceMap {
+								// We need to type assert to set context/project if InitService is the way
+								// Or just call InitService again?
+								// Looking at InitialModel, we call InitService(ctx, projectID)
+								// We need to do that here.
+								// We can iterate and switch based on ShortName or try type assertion
+								if s, ok := svc.(interface {
+									InitService(context.Context, string) error
+								}); ok {
+									// Run in background? Service init might be blocking?
+									// Most InitService just create client.
+									// Let's do it synchronously for now or wrap in Cmd?
+									// Wrapping in Cmd is better for responsiveness but tricky to synchronize.
+									// Let's do sync for MVP.
+									if err := s.InitService(context.Background(), newProjectID); err != nil {
+										m.StatusBar.Message = "Error initializing service " + svc.ShortName() + ": " + err.Error()
+										m.StatusBar.IsError = true
+									}
+								}
+								svc.Reset()
+							}
+
+							m.StatusBar.Message = "Switched to project: " + newProjectID
+							m.Navigation.RestoreBaseCommands()
+							m.ViewMode = ViewHome
+							m.Sidebar.Active = false
+						} else {
+							m.ViewMode = ViewHome
+							m.Sidebar.Active = false
+						}
 					} else if route.View == core.ViewServiceList {
 						// Logic to switch service
 						m.ViewMode = ViewService
@@ -249,6 +309,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						m.Focus = FocusSidebar
 						m.Sidebar.Active = true
+					} else if route.View == core.ViewProjectSwitcher {
+						// Trigger fetch projects
+						cmds = append(cmds, func() tea.Msg {
+							projects, err := m.ProjectManager.ListProjects(context.Background())
+							if err != nil {
+								return core.StatusMsg{Message: "Failed to list projects: " + err.Error(), IsError: true}
+							}
+							return projects
+						})
+						// Keep palette open? Yes.
+						// Status update?
+						m.StatusBar.Message = "Fetching projects..."
+						m.Focus = FocusPalette
+						return m, tea.Batch(cmds...)
 					}
 					// Close Palette
 					m.Focus = m.LastFocus
@@ -371,17 +445,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Actually 'h' in sidebar usually collapses or does nothing contextually
 						// But for now let's just keep 'left' behavior or ignore it for consistency
 					}
-				case "right":
-					if m.Focus == FocusSidebar && m.Sidebar.Visible {
-						m.Focus = FocusMain
-						m.Sidebar.Active = false
-						if m.CurrentSvc != nil {
-							m.CurrentSvc.Focus() // Highlight selection
-						}
-						return m, nil
-					}
-				case "l":
-					// 'l' in sidebar can move to main
+				case "right", "l":
 					if m.Focus == FocusSidebar && m.Sidebar.Visible {
 						m.Focus = FocusMain
 						m.Sidebar.Active = false
@@ -415,6 +479,72 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmds...)
 			}
 		}
+
+	case []core.Project:
+		// Projects Fetched
+		var cmds []core.Command
+		for _, p := range msg {
+			// Capture variable
+			p := p
+			cmds = append(cmds, core.Command{
+				Name:        p.ID,
+				Description: p.Name,
+				Action: func() core.Route {
+					return core.Route{
+						View: core.ViewHome,
+						ID:   "SWITCH_PROJECT:" + p.ID,
+					}
+				},
+			})
+		}
+		m.Navigation.SetCommands(cmds)
+		m.StatusBar.Message = "Select a project to switch..."
+		return m, nil
+
+	case core.SwitchToLogsMsg:
+		// Switch to Logging Service
+		m.ViewMode = ViewService
+		m.ActiveService = "logs"
+		// Sync Sidebar
+		for i, item := range m.Sidebar.Items {
+			if item.ShortName == "logs" {
+				m.Sidebar.Cursor = i
+				break
+			}
+		}
+
+		if svc, exists := m.ServiceMap["logs"]; exists {
+			// Cast to Logging Service to set filter
+			// We need a way to pass filter. Is it exposed?
+			// The interface Service doesn't have SetFilter.
+			// We can use type assertion.
+			if logSvc, ok := svc.(interface{ SetFilter(string) }); ok {
+				logSvc.SetFilter(msg.Filter)
+			}
+
+			svc.Reset()
+			svc.Blur()
+			m.CurrentSvc = svc
+
+			// Sync Window Size
+			if m.Width > 0 && m.Height > 0 {
+				newModel, _ := svc.Update(tea.WindowSizeMsg{
+					Width:  m.Width,
+					Height: m.Height,
+				})
+				if updatedSvc, ok := newModel.(services.Service); ok {
+					svc = updatedSvc
+					m.ServiceMap["logs"] = svc
+					m.CurrentSvc = svc
+				}
+			}
+
+			// Trigger Refresh
+			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+		}
+		m.Focus = FocusSidebar
+		m.Sidebar.Active = true
+		return m, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
@@ -480,7 +610,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	// Dynamic Help Text
-	if m.ViewMode == ViewHome {
+	if m.Focus == FocusPalette {
+		m.StatusBar.SetHelpText("Esc:Cancel  Enter:Run  ↑/↓:Select")
+	} else if m.ViewMode == ViewHome {
 		m.StatusBar.SetHelpText("q:Quit  ?:Help  Enter:Select")
 	} else if m.CurrentSvc != nil {
 		m.StatusBar.SetHelpText(m.CurrentSvc.HelpText())

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/rk/tgcp/internal/utils"
 	"golang.org/x/oauth2/google"
@@ -102,6 +104,17 @@ func Authenticate(ctx context.Context, projectOverride string) AuthState {
 						state.UserEmail = val
 					}
 				}
+			}
+		}
+	}
+
+	// 4. Fallback: Try gcloud config
+	if state.UserEmail == "Unknown" || state.UserEmail == "" {
+		if cmdOut, err := exec.Command("gcloud", "config", "get-value", "account").Output(); err == nil {
+			email := strings.TrimSpace(string(cmdOut))
+			if email != "" {
+				state.UserEmail = email
+				utils.Log("Found user email via gcloud: %s", state.UserEmail)
 			}
 		}
 	}

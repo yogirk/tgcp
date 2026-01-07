@@ -79,7 +79,42 @@ func renderLandingPage(m MainModel) string {
 	menu := m.HomeMenu.View()
 
 	// Navigation Hints
-	hints := styles.HeaderStyle.Render("⌨️  Navigation: Enter (Select) | q (Quit)")
+	col1 := lipgloss.JoinVertical(lipgloss.Left,
+		styles.SubtleStyle.Render("Global"),
+		"q      Quit / Back",
+		"?      Toggle Help",
+		":      Cmd Palette",
+		"/      Filter List",
+	)
+
+	col2 := lipgloss.JoinVertical(lipgloss.Left,
+		styles.SubtleStyle.Render("Navigation"),
+		"↑/↓    Move Cursor",
+		"← / →  Focus Panes",
+		"Enter  Select / Detail",
+		"Tab    Toggle Sidebar",
+		"Esc    Go Back",
+	)
+
+	col3 := lipgloss.JoinVertical(lipgloss.Left,
+		styles.SubtleStyle.Render("Actions"),
+		"r      Refresh Data",
+		"s      Start Resource",
+		"x      Stop Resource",
+		"h      SSH Connect",
+	)
+
+	hints := styles.BoxStyle.Copy().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.ColorSecondary).
+		Padding(1, 2).
+		Render(lipgloss.JoinHorizontal(lipgloss.Top,
+			col1,
+			"    ", // spacer
+			col2,
+			"    ", // spacer
+			col3,
+		))
 
 	// Layout: Center everything
 	// We use lipgloss.Place to center vertically and horizontally
@@ -90,9 +125,9 @@ func renderLandingPage(m MainModel) string {
 		banner,
 		"\n",
 		infoBox,
-		"\n\n",
+		"\n",
 		menu,
-		"\n\n",
+		"\n",
 		hints,
 	)
 
