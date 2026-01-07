@@ -2,260 +2,291 @@ package logging
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rk/tgcp/internal/core"
 	"github.com/rk/tgcp/internal/styles"
-	"github.com/rk/tgcp/internal/ui/components"
 )
 
-// ViewState represents the current view
-type ViewState int
+const CacheTTL = 10 * time.Second // Logs change frequently
 
-const (
-	ViewList ViewState = iota
-	ViewDetail
-)
+// Tick message for background refresh
+type tickMsg time.Time
 
-// Service implements the logging service
+// Service implements the services.Service interface for Cloud Logging
 type Service struct {
 	client    *Client
 	projectID string
-	cache     *core.Cache
-	ctx       context.Context
-	cancel    context.CancelFunc
-
-	// State
-	viewState   ViewState
-	entries     []LogEntry
-	selectedLog *LogEntry
-	filter      string
-	loading     bool
-	err         error
-	mu          sync.RWMutex
+	table     table.Model
 
 	// UI Components
-	table    table.Model
-	viewport viewport.Model
+	filterInput textinput.Model
+	filtering   bool
+
+	// State
+	entries []LogEntry
+	loading       bool
+	err           error
+	nextPageToken string
+
+	// Cache
+	cache *core.Cache
 }
 
-// NewService creates a new logging service
 func NewService(cache *core.Cache) *Service {
 	// Table Setup
 	columns := []table.Column{
-		{Title: "Time", Width: 20},
+		{Title: "Time", Width: 25}, // 2006-01-02 15:04:05 fits in ~20 chars
 		{Title: "Severity", Width: 10},
-		{Title: "Resource", Width: 15},
-		{Title: "Message", Width: 50},
+		{Title: "Resource", Width: 20},
+		{Title: "Name", Width: 20},
+    	{Title: "Location", Width: 15},
+		{Title: "Payload", Width: 60},
 	}
-	t := components.NewTable(columns, []table.Row{})
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithFocused(true),
+		table.WithHeight(10),
+	)
+
+	// Custom Table Styles
+	s := table.DefaultStyles()
+	s.Header = styles.HeaderStyle
+	s.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	
+	// Add bottom border to all cells for "clear separated line"
+	s.Cell = s.Cell.Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(0, 1) // Add horizontal padding for "clear indentation"
+
+	t.SetStyles(s)
+
+	// Filter Input Setup
+	ti := textinput.New()
+	ti.Placeholder = "Filter (e.g. severity>=ERROR)"
+	ti.Prompt = "/ "
+	ti.CharLimit = 200
+	ti.Width = 60
+	ti.SetValue("") // Default to empty (triggers last 30m in api.go)
 
 	return &Service{
-		cache:     cache,
-		table:     t.Table, // Use the underlying table.Model
-		viewState: ViewList,
+		table:       t,
+		filterInput: ti,
+		cache:       cache,
 	}
 }
 
-// Init implements tea.Model
-func (s *Service) Init() tea.Cmd {
-	return nil
-}
-
-// Name returns the display name
 func (s *Service) Name() string {
 	return "Cloud Logging"
 }
 
-// ShortName returns the ID
 func (s *Service) ShortName() string {
 	return "logs"
 }
 
-// InitService initializes the service
+func (s *Service) HelpText() string {
+	if s.filtering {
+		return "Esc:Cancel  Enter:Apply"
+	}
+	base := "r:Refresh  /:Filter  Esc/q:Back"
+	if s.nextPageToken != "" {
+		base = "r:Refresh  /:Filter  n:Next Page  Esc/q:Back"
+	}
+	return base
+}
+
+// Focus handles input focus
+func (s *Service) Focus() {
+	s.table.Focus()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+// Blur handles loss of input focus
+func (s *Service) Blur() {
+	s.table.Blur()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(styles.ColorText).
+		Background(lipgloss.Color("237")). // Dark grey
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+// Msg types
+type entriesMsg struct {
+	entries   []LogEntry
+	nextToken string
+}
+type errMsg error
+
+// InitService initializes the service logic (API clients)
 func (s *Service) InitService(ctx context.Context, projectID string) error {
 	s.projectID = projectID
-	s.ctx, s.cancel = context.WithCancel(ctx)
-
-	client, err := NewClient(s.ctx, projectID)
+	client, err := NewClient(ctx, projectID)
 	if err != nil {
 		return err
 	}
 	s.client = client
+	
+	// Initial fetch
+	// We return nil here as this is synchronous init called by app
+	// The actual fetch happens via Refresh/Init command usually
 	return nil
 }
 
-// SetFilter updates the log filter and refreshes
-func (s *Service) SetFilter(filter string) {
-	s.mu.Lock()
-	s.filter = filter
-	s.viewState = ViewList // Reset to list
-	s.mu.Unlock()
+// Init satisfies tea.Model interface, starts background tick
+func (s *Service) Init() tea.Cmd {
+	return tea.Batch(
+		s.tick(),
+		s.Refresh(), // Trigger first fetch
+	)
 }
 
-// Update handles messages
+func (s *Service) tick() tea.Cmd {
+	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+// Update handles messages specific to Logging
 func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "r":
-			return s, s.Refresh()
-		case "esc", "q":
-			if s.viewState == ViewDetail {
-				s.viewState = ViewList
-				return s, nil
-			}
-			// Let parent handle exit if at root
-		case "enter":
-			if s.viewState == ViewList {
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.entries) {
-					s.selectedLog = &s.entries[idx]
-					s.viewState = ViewDetail
-					// Initialize viewport content
-					s.viewport = viewport.New(0, 0) // Dimensions set by WindowSizeMsg
-					s.viewport.SetContent(s.renderLogDetails(s.selectedLog))
-				}
-			}
-		}
+	case tickMsg:
+		// Background refresh always fetches page 1 (empty token) to see latest
+		return s, tea.Batch(s.fetchEntriesCmd(""), s.tick())
+
+	case entriesMsg:
+		s.loading = false
+		s.entries = msg.entries
+		s.nextPageToken = msg.nextToken
+		s.updateTable(s.entries)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+
+	case errMsg:
+		s.loading = false
+		s.err = msg
 
 	case tea.WindowSizeMsg:
-		s.table.SetWidth(msg.Width - 4)
-		s.table.SetHeight(msg.Height - 8)
-		s.viewport.Width = msg.Width - 4
-		s.viewport.Height = msg.Height - 8
-
-	case []LogEntry:
-		s.mu.Lock()
-		s.entries = msg
-		s.loading = false
-		s.mu.Unlock()
-
-		// Update Table
-		rows := make([]table.Row, len(msg))
-		for i, e := range msg {
-			rows[i] = table.Row{
-				e.Timestamp.Format("15:04:05"),
-				e.Severity,
-				e.ResourceID, // Show ID as it's more specific
-				e.Payload,
-			}
+		const heightOffset = 6
+		newHeight := msg.Height - heightOffset
+		if newHeight < 5 {
+			newHeight = 5
 		}
-		s.table.SetRows(rows)
+		s.table.SetHeight(newHeight)
 
-	case error:
-		s.err = msg
-		s.loading = false
-	}
+	case tea.KeyMsg:
+		// FILTERING MODE
+		if s.filtering {
+			switch msg.String() {
+			case "esc":
+				s.filtering = false
+				s.filterInput.Blur()
+				// Revert to valid filter or keep?
+				// s.filterInput.Reset() 
+				return s, nil
+			case "enter":
+				s.filtering = false
+				s.filterInput.Blur()
+				return s, s.Refresh() // Apply filter
+			}
 
-	if s.viewState == ViewList {
+			var inputCmd tea.Cmd
+			s.filterInput, inputCmd = s.filterInput.Update(msg)
+			return s, inputCmd
+		}
+
+		// LIST VIEW
+		switch msg.String() {
+		case "/":
+			s.filtering = true
+			s.filterInput.Focus()
+			return s, textinput.Blink
+		case "r":
+			return s, s.Refresh()
+		case "n":
+			if s.nextPageToken != "" {
+				s.loading = true
+				return s, s.fetchEntriesCmd(s.nextPageToken)
+			}
+		// case "enter": // View Details
+		}
+		
 		s.table, cmd = s.table.Update(msg)
-	} else {
-		s.viewport, cmd = s.viewport.Update(msg)
+		return s, cmd
 	}
 
 	return s, cmd
 }
 
-// View renders the service UI
-func (s *Service) View() string {
-	if s.loading {
-		return "Loading logs..."
-	}
-	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
-	}
-
-	if s.viewState == ViewList {
-		header := styles.SubtleStyle.Render(fmt.Sprintf("Logging > Stream (Filter: %s)", s.filter))
-		return lipgloss.JoinVertical(lipgloss.Left, header, s.table.View())
-	}
-
-	// Detail View
-	if s.selectedLog != nil {
-		header := styles.SubtleStyle.Render(fmt.Sprintf("Logging > Stream > %s", s.selectedLog.InsertID))
-		return lipgloss.JoinVertical(lipgloss.Left, header, s.viewport.View())
-	}
-
-	return ""
+// SetFilter sets the filter string (used by other components to jump to logs)
+func (s *Service) SetFilter(filter string) {
+	s.filterInput.SetValue(filter)
+	s.filtering = true // optional: enter filtering mode or just apply?
+	// If we want to auto-apply, we might need to trigger refresh, but this is just setting state.
+	// The caller (SwitchToLogsMsg) calls Refresh() right after.
 }
 
-// Refresh triggers data reload
-func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
+func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil {
-			return fmt.Errorf("logging client not initialized")
+			return errMsg(fmt.Errorf("client not initialized"))
 		}
-		entries, err := s.client.ListEntries(s.ctx, s.filter)
+
+		filter := s.filterInput.Value()
+		pageSize := 20 // Requirement: 10 entries by default
+		
+		entries, nextToken, err := s.client.ListEntries(context.Background(), filter, pageSize, token)
 		if err != nil {
-			return err
+			return errMsg(err)
 		}
-		return entries
+		return entriesMsg{entries: entries, nextToken: nextToken}
 	}
 }
 
-// HelpText returns keys
-func (s *Service) HelpText() string {
-	if s.viewState == ViewList {
-		return "r:Refresh  Ent:Detail"
-	}
-	return "Esc/q:Back"
+func (s *Service) Refresh() tea.Cmd {
+	s.loading = true
+	return s.fetchEntriesCmd("")
 }
 
-// Focus/Blur/Reset
-func (s *Service) Focus() { s.table.Focus() }
-func (s *Service) Blur()  { s.table.Blur() }
 func (s *Service) Reset() {
-	s.viewState = ViewList
-	s.filter = "" // Or keep? Ideally reset if coming from fresh.
-}
-func (s *Service) IsRootView() bool { return s.viewState == ViewList }
-
-func (s *Service) renderLogDetails(e *LogEntry) string {
-	// Pretty print JSON if possible
-	var prettyJSON string
-	var obj interface{}
-	if err := json.Unmarshal([]byte(e.FullPayload), &obj); err == nil {
-		b, _ := json.MarshalIndent(obj, "", "  ")
-		prettyJSON = string(b)
-	} else {
-		prettyJSON = e.FullPayload
-	}
-
-	return fmt.Sprintf(`
-Timestamp: %s
-Severity:  %s
-Resource:  %s (%s)
-InsertID:  %s
-
-Payload:
-%s
-`,
-		e.Timestamp,
-		renderSeverity(e.Severity),
-		e.Resource, e.ResourceID,
-		e.InsertID,
-		prettyJSON,
-	)
+	s.err = nil
+	s.table.SetCursor(0)
 }
 
-func renderSeverity(sev string) string {
-	switch sev {
-	case "ERROR", "CRITICAL", "EMERGENCY", "ALERT":
-		return styles.ErrorStyle.Render(sev)
-	case "WARNING":
-		return styles.WarningStyle.Render(sev)
-	case "INFO":
-		return styles.SuccessStyle.Render(sev)
-	default:
-		return styles.SubtleStyle.Render(sev)
+func (s *Service) IsRootView() bool {
+	return true
+}
+
+func (s *Service) updateTable(entries []LogEntry) {
+	rows := make([]table.Row, len(entries))
+	for i, e := range entries {
+		rows[i] = table.Row{
+			// Improved timestamp format with date
+			e.Timestamp.Local().Format("2006-01-02 15:04:05"),
+			renderSeverity(e.Severity),
+			e.ResourceType,
+			e.ResourceName,
+			e.Location,
+			e.Payload,
+		}
 	}
+	s.table.SetRows(rows)
 }

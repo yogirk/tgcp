@@ -22,6 +22,7 @@ func NewHomeMenu() HomeMenuModel {
 			{Name: "Cloud Storage (GCS)", ShortName: "gcs"},
 			{Name: "BigQuery", ShortName: "bq"},
 			{Name: "Networking", ShortName: "net"},
+			{Name: "Cloud Logging", ShortName: "logs"},
 		},
 		Cursor:    0,
 		IsFocused: true,
