@@ -120,6 +120,30 @@ func (s *Service) HelpText() string {
 	return ""
 }
 
+// Focus handles input focus
+func (s *Service) Focus() {
+	s.table.Focus()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+// Blur handles loss of input focus
+func (s *Service) Blur() {
+	s.table.Blur()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(styles.ColorText).
+		Background(lipgloss.Color("237")). // Dark grey
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
 // Msg types
 type instancesMsg []Instance
 type errMsg error
@@ -395,9 +419,11 @@ func (s *Service) Refresh() tea.Cmd {
 }
 
 // Reset resets the service state
+// Reset resets the service state
 func (s *Service) Reset() {
 	s.viewState = ViewList
 	s.selectedInstance = nil
+	s.err = nil          // Fix: Clear previous errors on reset
 	s.table.SetCursor(0) // Optional: reset cursor to top
 }
 

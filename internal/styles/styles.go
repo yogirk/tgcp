@@ -84,4 +84,18 @@ var (
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(ColorSubtext).
 			Italic(true)
+
+	// Tab Styles
+	ActiveTabStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder(), true, true, false, true).
+			BorderForeground(ColorPrimary).
+			Padding(0, 1).
+			Bold(true).
+			Foreground(ColorPrimary)
+
+	InactiveTabStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder(), true, true, false, true).
+				BorderForeground(ColorSubtext).
+				Padding(0, 1).
+				Foreground(ColorSubtext)
 )

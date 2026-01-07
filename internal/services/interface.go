@@ -29,6 +29,12 @@ type Service interface {
 	// Refresh triggers a data reload
 	Refresh() tea.Cmd
 
+	// Focus is called when the service gains input focus
+	Focus()
+
+	// Blur is called when the service loses input focus
+	Blur()
+
 	// Reset resets the service state (e.g. back to list view)
 	Reset()
 

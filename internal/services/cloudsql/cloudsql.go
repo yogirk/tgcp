@@ -103,6 +103,28 @@ func (s *Service) HelpText() string {
 	return ""
 }
 
+func (s *Service) Focus() {
+	s.table.Focus()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+func (s *Service) Blur() {
+	s.table.Blur()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
+		Foreground(styles.ColorText).
+		Background(lipgloss.Color("237")). // Dark grey
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
 func (s *Service) InitService(ctx context.Context, projectID string) error {
 	s.projectID = projectID
 	client, err := NewClient(ctx)
@@ -291,6 +313,7 @@ func (s *Service) Refresh() tea.Cmd {
 func (s *Service) Reset() {
 	s.viewState = ViewList
 	s.selectedInstance = nil
+	s.err = nil // Fix: Clear previous errors on reset
 	s.table.SetCursor(0)
 }
 

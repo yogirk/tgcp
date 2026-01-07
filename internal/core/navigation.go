@@ -57,6 +57,8 @@ func defaultCommands() []Command {
 		{Name: "GCE: List Instances", Description: "List Google Compute Engine VM instances", Action: func() Route { return Route{View: ViewServiceList, Service: "gce"} }},
 		{Name: "SQL: List Instances", Description: "List Cloud SQL instances", Action: func() Route { return Route{View: ViewServiceList, Service: "sql"} }},
 		{Name: "IAM: List Service Accounts", Description: "List IAM Service Accounts", Action: func() Route { return Route{View: ViewServiceList, Service: "iam"} }},
+		{Name: "Run: List Services", Description: "List Cloud Run Services", Action: func() Route { return Route{View: ViewServiceList, Service: "run"} }},
+		{Name: "GCS: List Buckets", Description: "List Cloud Storage Buckets", Action: func() Route { return Route{View: ViewServiceList, Service: "gcs"} }},
 		{Name: "Help", Description: "Show Help Screen", Action: func() Route { return Route{View: ViewHelp} }},
 		// Add more commands here (e.g., Refresh, Quit)
 	}

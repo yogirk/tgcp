@@ -27,17 +27,34 @@ func (m MainModel) View() string {
 		content = renderServiceLayout(m)
 	}
 
-	// Overlays (Command Palette)
+	// Status Bar (Always Visible at bottom)
+	statusBar := m.StatusBar.View()
+
+	// Layout Content + Status Bar
+	// But first, let's just make the root content
+	screen := lipgloss.JoinVertical(lipgloss.Top, content, statusBar)
+
+	// 3. Overlays (Command Palette)
 	if m.Navigation.PaletteActive {
-		// Render palette at bottom
-		palette := styles.BoxStyle.Render("Command Palette: " + m.StatusBar.Message)
-		content = lipgloss.JoinVertical(lipgloss.Top, content, palette)
-	} else {
-		// Render Status Bar
-		content = lipgloss.JoinVertical(lipgloss.Top, content, m.StatusBar.View())
+		// Overlay Palette on top of the entire screen
+		// Note: Palette.Render uses lipgloss.Place to center itself in the given dimensions
+		paletteView := m.Palette.Render(m.Navigation, m.Height, GetBanner())
+
+		// To truly "overlay" in TUI without clearing background is hard with just string concatenation.
+		// However, lipgloss.Place will fill the screen with whitespace if we aren't careful.
+		// A common trick is to just return only the palette view if we want it modal?
+		// No, we want transparency or at least context.
+		// But in simple TUI, rendering a "modal" often means rendering it *instead* of content, or
+		// rendering it on top if the terminal supports cursor positioning hacks, but bubbletea 'View' returns a string.
+		//
+		// If we return just paletteView (which is centered), the rest is blank?
+		// Palette.Render does `lipgloss.Place(..., ui)`. If whitespace is handled, it replaces screen.
+		// Let's try just returning the palette view for focus, as it's a modal task.
+		// It's cleaner than trying to merge strings.
+		return paletteView
 	}
 
-	return content
+	return screen
 }
 
 // renderLandingPage renders the central home screen

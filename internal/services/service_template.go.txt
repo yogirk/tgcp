@@ -1,0 +1,300 @@
+package template_service
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/rk/tgcp/internal/core"
+	"github.com/rk/tgcp/internal/styles"
+)
+
+const CacheTTL = 30 * time.Second
+
+// -----------------------------------------------------------------------------
+// Models
+// -----------------------------------------------------------------------------
+
+// ExampleItem represents a resource managed by this service
+type ExampleItem struct {
+	Name   string
+	Status string
+	ID     string
+}
+
+// Tick message for background refresh
+type tickMsg time.Time
+
+// ViewState defines the current UI state of the service
+type ViewState int
+
+const (
+	ViewList ViewState = iota
+	ViewDetail
+	ViewConfirmation
+)
+
+// dataMsg is the message used to pass fetched data
+type dataMsg []ExampleItem
+
+// errMsg is the standard error message
+type errMsg error
+
+// -----------------------------------------------------------------------------
+// Service Definition
+// -----------------------------------------------------------------------------
+
+// Service implements the services.Service interface
+type Service struct {
+	client    *Client // Your API Client
+	projectID string
+	table     table.Model
+
+	// UI Components
+	filterInput textinput.Model
+	filtering   bool
+
+	// State
+	items     []ExampleItem
+	loading   bool
+	err       error
+
+	// View State
+	viewState    ViewState
+	selectedItem *ExampleItem
+
+	// Cache
+	cache *core.Cache
+}
+
+// NewService creates a new instance of the service
+func NewService(cache *core.Cache) *Service {
+	// 1. Table Setup
+	columns := []table.Column{
+		{Title: "Name", Width: 30},
+		{Title: "Status", Width: 15},
+		{Title: "ID", Width: 20},
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithFocused(true),
+		table.WithHeight(10),
+	)
+
+	// Apply styles (Copy-paste this logic exactly to maintain consistency)
+	s := table.DefaultStyles()
+	s.Header = styles.HeaderStyle
+	s.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	t.SetStyles(s)
+
+	// 2. Filter Input Setup (if needed)
+	ti := textinput.New()
+	ti.Placeholder = "Filter items..."
+	ti.Prompt = "/ "
+	ti.CharLimit = 100
+	ti.Width = 50
+
+	return &Service{
+		table:       t,
+		filterInput: ti,
+		viewState:   ViewList,
+		cache:       cache,
+	}
+}
+
+// Name returns the full human-readable name
+func (s *Service) Name() string {
+	return "Template Service"
+}
+
+// ShortName returns the specialized identifier (e.g. "gce", "sql")
+func (s *Service) ShortName() string {
+	return "template"
+}
+
+// HelpText returns context-aware keybindings
+func (s *Service) HelpText() string {
+	if s.viewState == ViewList {
+		return "r:Refresh  /:Filter  Ent:Detail"
+	}
+	if s.viewState == ViewDetail {
+		return "Esc/q:Back"
+	}
+	return ""
+}
+
+// -----------------------------------------------------------------------------
+// Lifecycle & Interface Implementation
+// -----------------------------------------------------------------------------
+
+// InitService initializes the API client
+func (s *Service) InitService(ctx context.Context, projectID string) error {
+	s.projectID = projectID
+	// Initialize your client here
+	// client, err := NewClient(ctx)
+	// if err != nil { return err }
+	// s.client = client
+	return nil
+}
+
+// Init startup commands (e.g. background tick)
+func (s *Service) Init() tea.Cmd {
+	return s.tick()
+}
+
+// tick creates a background ticker for cache invalidation
+func (s *Service) tick() tea.Cmd {
+	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+// Refresh triggers a forced data reload
+func (s *Service) Refresh() tea.Cmd {
+	s.loading = true
+	return s.fetchDataCmd(true)
+}
+
+// Reset clears the service state when navigating away or switching projects
+func (s *Service) Reset() {
+	s.viewState = ViewList
+	s.selectedItem = nil
+	s.err = nil          // CRITICAL: Always clear errors on reset
+	s.table.SetCursor(0) // Reset table position
+}
+
+// IsRootView returns true if we are at the top-level list
+func (s *Service) IsRootView() bool {
+	return s.viewState == ViewList
+}
+
+// Focus handles input focus (Visual Highlight)
+func (s *Service) Focus() {
+	s.table.Focus()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	// Use the "Active" Purple Style
+	st.Selected = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+// Blur handles loss of input focus (Visual Dimming)
+func (s *Service) Blur() {
+	s.table.Blur()
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	// Use the "Inactive" Grey Style
+	st.Selected = lipgloss.NewStyle().
+		Foreground(styles.ColorText).
+		Background(lipgloss.Color("237")). // Dark grey
+		Bold(false)
+	s.table.SetStyles(st)
+}
+
+// -----------------------------------------------------------------------------
+// Update Loop
+// -----------------------------------------------------------------------------
+
+func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	// 1. Background Tick
+	case tickMsg:
+		return s, tea.Batch(s.fetchDataCmd(false), s.tick())
+
+	// 2. Data Loaded
+	case dataMsg:
+		s.loading = false
+		s.items = msg
+		s.updateTable(s.items)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+
+	// 3. Error Handling
+	case errMsg:
+		s.loading = false
+		s.err = msg
+
+	// 4. Window Resize
+	case tea.WindowSizeMsg:
+		// Logic to resize table height dynamically
+		const heightOffset = 6 // app header + status bar + padding
+		newHeight := msg.Height - heightOffset
+		if newHeight < 5 {
+			newHeight = 5
+		}
+		s.table.SetHeight(newHeight)
+
+	// 5. User Input
+	case tea.KeyMsg:
+		// Handle global keys or specific view logic here
+		if s.viewState == ViewList {
+			switch msg.String() {
+			case "r":
+				return s, s.Refresh()
+			case "enter":
+				// Handle selection
+			}
+			s.table, cmd = s.table.Update(msg)
+			return s, cmd
+		}
+	}
+
+	return s, nil
+}
+
+// -----------------------------------------------------------------------------
+// View Rendering
+// -----------------------------------------------------------------------------
+
+func (s *Service) View() string {
+	if s.loading {
+		return "Loading..."
+	}
+	if s.err != nil {
+		return fmt.Sprintf("Error: %v", s.err)
+	}
+
+	if s.viewState == ViewDetail {
+		return "Detail View Placeholder"
+	}
+
+	// Default: List View
+	return s.renderListView()
+}
+
+func (s *Service) renderListView() string {
+	// Main table view
+	return s.table.View()
+}
+
+// -----------------------------------------------------------------------------
+// Helper Commands
+// -----------------------------------------------------------------------------
+
+func (s *Service) fetchDataCmd(force bool) tea.Cmd {
+	return func() tea.Msg {
+		// Implement API call logic with Caching here
+		// ...
+		return dataMsg(nil)
+	}
+}
+
+func (s *Service) updateTable(items []ExampleItem) {
+	rows := make([]table.Row, len(items))
+	for i, item := range items {
+		rows[i] = table.Row{item.Name, item.Status, item.ID}
+	}
+	s.table.SetRows(rows)
+}

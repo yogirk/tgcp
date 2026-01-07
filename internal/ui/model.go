@@ -7,8 +7,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rk/tgcp/internal/core"
 	"github.com/rk/tgcp/internal/services"
+	"github.com/rk/tgcp/internal/services/bigquery"
+	"github.com/rk/tgcp/internal/services/cloudrun"
 	"github.com/rk/tgcp/internal/services/cloudsql"
 	"github.com/rk/tgcp/internal/services/gce"
+	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/iam"
 	"github.com/rk/tgcp/internal/ui/components"
 )
@@ -47,6 +50,7 @@ type MainModel struct {
 	Sidebar   components.SidebarModel
 	HomeMenu  components.HomeMenuModel // Added
 	StatusBar components.StatusBarModel
+	Palette   components.PaletteModel // Added
 
 	// State
 	ViewMode      ViewMode // Added
@@ -85,12 +89,34 @@ func InitialModel(authState core.AuthState) MainModel {
 	}
 	svcMap["iam"] = iamSvc
 
+	// Create Cloud Run Service
+	runSvc := cloudrun.NewService(cache)
+	if authState.ProjectID != "" {
+		runSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["run"] = runSvc
+
+	// Create GCS Service
+	gcsSvc := gcs.NewService(cache)
+	if authState.ProjectID != "" {
+		gcsSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["gcs"] = gcsSvc
+
+	// Create BigQuery Service
+	bqSvc := bigquery.NewService(cache)
+	if authState.ProjectID != "" {
+		bqSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["bq"] = bqSvc
+
 	return MainModel{
 		AuthState:  authState,
 		Navigation: core.NewNavigation(),
 		Sidebar:    components.NewSidebar(),
 		HomeMenu:   components.NewHomeMenu(), // Added
 		StatusBar:  components.NewStatusBar(),
+		Palette:    components.NewPalette(), // Added
 		Focus:      FocusSidebar,
 		ViewMode:   ViewHome, // Start at Home
 		ServiceMap: svcMap,
@@ -99,7 +125,7 @@ func InitialModel(authState core.AuthState) MainModel {
 
 // Init initializes the bubbletea program
 func (m MainModel) Init() tea.Cmd {
-	return nil
+	return tea.EnableMouseCellMotion
 }
 
 // Update handles messages and updates the model
@@ -166,13 +192,93 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			// Palette specific keys (Esc to close)
-			if msg.String() == "esc" {
+			// Palette specific keys (Esc to close)
+			switch msg.String() {
+			case "esc":
 				m.Focus = m.LastFocus
 				m.Navigation.PaletteActive = false
 				m.StatusBar.Mode = "NORMAL"
 				m.StatusBar.Message = "Ready"
+				m.Palette.TextInput.Reset() // Clear input
+				m.Navigation.FilterCommands("")
 				return m, nil
+			case "up":
+				m.Navigation.SelectPrev()
+				return m, nil
+			case "down":
+				m.Navigation.SelectNext()
+				return m, nil
+			case "enter":
+				// Execute Command
+				if route := m.Navigation.ExecuteSelection(); route != nil {
+					// Route Logic
+					if route.View == core.ViewHome {
+						m.ViewMode = ViewHome
+						m.Sidebar.Active = false
+					} else if route.View == core.ViewServiceList {
+						// Logic to switch service
+						m.ViewMode = ViewService
+						m.ActiveService = route.Service
+						// Sync Sidebar
+						for i, item := range m.Sidebar.Items {
+							if item.ShortName == route.Service {
+								m.Sidebar.Cursor = i
+							}
+						}
+						// Initialize service if needed (similar to sidebar logic)
+						if svc, exists := m.ServiceMap[m.ActiveService]; exists {
+							svc.Reset()
+							svc.Blur()
+							m.CurrentSvc = svc
+
+							// Sync Window Size
+							if m.Width > 0 && m.Height > 0 {
+								newModel, _ := svc.Update(tea.WindowSizeMsg{
+									Width:  m.Width,
+									Height: m.Height,
+								})
+								if updatedSvc, ok := newModel.(services.Service); ok {
+									svc = updatedSvc
+									m.ServiceMap[m.ActiveService] = svc
+									m.CurrentSvc = svc
+								}
+							}
+
+							// trigger refresh
+							cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+						}
+						m.Focus = FocusSidebar
+						m.Sidebar.Active = true
+					}
+					// Close Palette
+					m.Focus = m.LastFocus
+					// If we switched view, we might want to focus something specific?
+					// For now, restore last focus (which might be weird if we changed views)
+					// Actually, if we switched service, we force FocusSidebar above.
+					if route.View == core.ViewHome {
+						m.Focus = FocusSidebar // or menu
+					}
+
+					m.Navigation.PaletteActive = false
+					m.StatusBar.Mode = "NORMAL"
+					m.StatusBar.Message = "Ready"
+					m.Palette.TextInput.Reset()
+					m.Navigation.FilterCommands("")
+				}
+				return m, tea.Batch(cmds...)
 			}
+
+			// Forward other keys to Palette Input
+			var cmd tea.Cmd
+			m.Palette, cmd = m.Palette.Update(msg)
+			cmds = append(cmds, cmd)
+
+			// Update Suggestions
+			if m.Palette.TextInput.Value() != m.Navigation.Query {
+				m.Navigation.FilterCommands(m.Palette.TextInput.Value())
+			}
+
+			return m, tea.Batch(cmds...)
 		}
 
 		// HOME MODE
@@ -201,7 +307,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Update Current Service
 					if svc, exists := m.ServiceMap[m.ActiveService]; exists {
 						svc.Reset() // Reset state (fix Bug 2)
+						svc.Blur()  // Ensure dimmed state initially (Fix UX Focus)
 						m.CurrentSvc = svc
+
+						// Sync Window Size immediately implementation (Fix Bug: Truncated list on entry)
+						if m.Width > 0 && m.Height > 0 {
+							newModel, _ := svc.Update(tea.WindowSizeMsg{
+								Width:  m.Width,
+								Height: m.Height,
+							})
+							if updatedSvc, ok := newModel.(services.Service); ok {
+								svc = updatedSvc
+								m.ServiceMap[m.ActiveService] = svc
+								m.CurrentSvc = svc // Update current pointer too
+							}
+						}
+
 						// Trigger Refresh
 						cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 					}
@@ -237,6 +358,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.Focus == FocusMain {
 						m.Focus = FocusSidebar
 						m.Sidebar.Active = true
+						if m.CurrentSvc != nil {
+							m.CurrentSvc.Blur() // Dim selection
+						}
 						// Do not forward 'left' to service
 						return m, nil
 					}
@@ -251,6 +375,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.Focus == FocusSidebar && m.Sidebar.Visible {
 						m.Focus = FocusMain
 						m.Sidebar.Active = false
+						if m.CurrentSvc != nil {
+							m.CurrentSvc.Focus() // Highlight selection
+						}
 						return m, nil
 					}
 				case "l":
@@ -258,6 +385,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.Focus == FocusSidebar && m.Sidebar.Visible {
 						m.Focus = FocusMain
 						m.Sidebar.Active = false
+						if m.CurrentSvc != nil {
+							m.CurrentSvc.Focus() // Highlight selection
+						}
+						return m, nil
+					}
+				case "enter":
+					// 'enter' in sidebar also moves to main
+					if m.Focus == FocusSidebar && m.Sidebar.Visible {
+						m.Focus = FocusMain
+						m.Sidebar.Active = false
+						if m.CurrentSvc != nil {
+							m.CurrentSvc.Focus()
+						}
 						return m, nil
 					}
 				}

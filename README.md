@@ -30,7 +30,7 @@ For the best experience, we recommend using [Google Sans Mono](https://fonts.goo
 ### Build from Source
 
 ```bash
-git clone https://github.com/rk/tgcp.git
+git clone https://github.com/yogirk/tgcp.git
 cd tgcp
 go build -o tgcp ./cmd/tgcp
 ```

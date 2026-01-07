@@ -29,8 +29,10 @@ func NewSidebar() SidebarModel {
 			{Name: "Compute Engine", ShortName: "gce", Active: true},
 			{Name: "Cloud SQL", ShortName: "sql"},
 			{Name: "IAM", ShortName: "iam"},
-			{Name: "Cloud Run", ShortName: "run", IsComing: true},
-			{Name: "Cloud Storage", ShortName: "gcs", IsComing: true},
+			{Name: "Cloud Run", ShortName: "run"},
+			{Name: "Cloud Storage", ShortName: "gcs"},
+			{Name: "BigQuery", ShortName: "bq"},
+			{Name: "Networking", ShortName: "net", IsComing: true},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start
