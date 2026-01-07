@@ -22,7 +22,7 @@ go.work
 .vscode/
 
 # Local build artifacts
-tgcp
+/tgcp
 tgcp-debug
 debug.log
 .tgcp/
