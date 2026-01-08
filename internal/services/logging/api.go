@@ -1,152 +1,147 @@
 package logging
 
 import (
-	"context"
-	"fmt"
-	"time"
+    "context"
+    "encoding/json"
+    "fmt"
+    "strings"
+    "time"
 
-	"cloud.google.com/go/logging"
-	"cloud.google.com/go/logging/logadmin"
-	"google.golang.org/api/iterator"
+    "google.golang.org/api/logging/v2"
+    "google.golang.org/api/option"
 )
 
-// Client wraps the Cloud Logging API
+// Client wraps the Cloud Logging API (v2 REST)
 type Client struct {
-	client *logging.Client
-	admin  *logadmin.Client
+    service *logging.Service
+    projectID string
 }
 
-// NewClient initializes a new Logging client
+// NewClient initializes a new Logging client using the v2 REST API
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
-	client, err := logging.NewClient(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logging client: %w", err)
-	}
+    // Use ADC with Logging Read scope
+    svc, err := logging.NewService(ctx, option.WithScopes(logging.LoggingReadScope))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create logging service: %w", err)
+    }
 
-	admin, err := logadmin.NewClient(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logadmin client: %w", err)
-	}
-
-	return &Client{
-		client: client,
-		admin:  admin,
-	}, nil
+    return &Client{
+        service:   svc,
+        projectID: projectID,
+    }, nil
 }
 
-// Close closes the clients
+// Close is a no-op for the REST service wrapper
 func (c *Client) Close() error {
-	if c.client != nil {
-		c.client.Close()
-	}
-	if c.admin != nil {
-		return c.admin.Close()
-	}
-	return nil
+    return nil
 }
 
 // ListEntries fetches log entries with pagination
 func (c *Client) ListEntries(
-	ctx context.Context,
-	filter string,
-	pageSize int,
-	pageToken string,
+    ctx context.Context,
+    filter string,
+    pageSize int,
+    pageToken string,
 ) ([]LogEntry, string, error) {
 
-	finalFilter := filter
-	if finalFilter == "" {
-		finalFilter = fmt.Sprintf(
-			"timestamp >= \"%s\"",
-			time.Now().Add(-30*time.Minute).Format(time.RFC3339),
-		)
-	}
+    finalFilter := filter
+    if finalFilter == "" {
+        finalFilter = fmt.Sprintf(
+            "timestamp >= \"%s\"",
+            time.Now().Add(-30*time.Minute).Format(time.RFC3339),
+        )
+    }
 
-	it := c.admin.Entries(
-		ctx,
-		logadmin.Filter(finalFilter),
-		logadmin.NewestFirst(),
-	)
-	pager := iterator.NewPager(it, pageSize, pageToken)
+    // Prepare request
+    req := c.service.Entries.List(&logging.ListLogEntriesRequest{
+        ResourceNames: []string{"projects/" + c.projectID},
+        Filter:        finalFilter,
+        PageSize:      int64(pageSize),
+        PageToken:     pageToken,
+        OrderBy:       "timestamp desc", // Equivalent to NewestFirst
+    })
 
-	var rawEntries []*logging.Entry
-	nextPageToken, err := pager.NextPage(&rawEntries)
-	if err != nil {
-		return nil, "", err
-	}
+    resp, err := req.Context(ctx).Do()
+    if err != nil {
+        return nil, "", fmt.Errorf("failed to list entries: %w", err)
+    }
 
-	var entries []LogEntry
+    var entries []LogEntry
+    for _, entry := range resp.Entries {
+        // Parse Timestamp
+        ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
+        // Try fallback if Nano fails
+        if ts.IsZero() {
+            ts, _ = time.Parse(time.RFC3339, entry.Timestamp)
+        }
 
-	for _, entry := range rawEntries {
+        // Determine Payload
+        payload := ""
+        if entry.TextPayload != "" {
+            payload = entry.TextPayload
+        } else if len(entry.JsonPayload) > 0 {
+            // JsonPayload is raw JSON map
+            b, _ := json.Marshal(entry.JsonPayload)
+            payload = string(b)
+        } else if len(entry.ProtoPayload) > 0 {
+            b, _ := json.Marshal(entry.ProtoPayload)
+            payload = string(b)
+        }
 
-		// -------- Payload --------
-		payload := ""
-		switch p := entry.Payload.(type) {
-		case string:
-			payload = p
-		default:
-			payload = fmt.Sprintf("%v", p)
-		}
+        // Extract Resource Info
+        var (
+            resourceType string
+            resourceName string
+            location     string
+            projID       string
+        )
 
-		// -------- Resource Extraction (STEP 2) --------
-		var (
-			resourceType string
-			resourceName string
-			location     string
-			projectID    string
-		)
+        if entry.Resource != nil {
+            resourceType = entry.Resource.Type
+            if entry.Resource.Labels != nil {
+                projID = entry.Resource.Labels["project_id"]
+                location = entry.Resource.Labels["zone"]
+                if location == "" {
+                    location = entry.Resource.Labels["location"]
+                }
 
-		if entry.Resource != nil {
-			res := entry.Resource
-			resourceType = res.Type
+                switch resourceType {
+                case "gce_instance":
+                    resourceName = entry.Resource.Labels["instance_id"]
+                case "cloud_run_revision":
+                    resourceName = entry.Resource.Labels["service_name"]
+                case "k8s_container":
+                    resourceName = fmt.Sprintf("%s/%s", entry.Resource.Labels["namespace_name"], entry.Resource.Labels["container_name"])
+                default:
+                    for _, v := range entry.Resource.Labels {
+                        resourceName = v
+                        break
+                    }
+                }
+            }
+        }
 
-			// Common labels across services
-			projectID = res.Labels["project_id"]
-			location = res.Labels["zone"]
-			if location == "" {
-				location = res.Labels["location"]
-			}
+        // Severity
+        severity := strings.ToUpper(entry.Severity)
 
-			// Resource-specific name resolution
-			switch res.Type {
-			case "gce_instance":
-				resourceName = res.Labels["instance_id"]
+        entries = append(entries, LogEntry{
+            Timestamp:    ts,
+            Severity:     severity,
+            Payload:      payload,
 
-			case "cloud_run_revision":
-				resourceName = res.Labels["service_name"]
+            ResourceType: resourceType,
+            ResourceName: resourceName,
+            Location:     location,
+            ProjectID:    projID,
 
-			case "k8s_container":
-				resourceName = fmt.Sprintf(
-					"%s/%s",
-					res.Labels["namespace_name"],
-					res.Labels["container_name"],
-				)
+            LogName:      entry.LogName,
+            Labels:       entry.Labels,
+            InsertID:     entry.InsertId,
+            FullPayload:  payload, // Simplified for now
+        })
+    }
 
-			default:
-				// Fallback: pick any meaningful label
-				for _, v := range res.Labels {
-					resourceName = v
-					break
-				}
-			}
-		}
-
-		entries = append(entries, LogEntry{
-			Timestamp:    entry.Timestamp,
-			Severity:     entry.Severity.String(),
-			Payload:      payload,
-
-			ResourceType: resourceType,
-			ResourceName: resourceName,
-			Location:     location,
-			ProjectID:    projectID,
-
-			LogName:      entry.LogName,
-			Labels:       entry.Labels,
-			InsertID:     entry.InsertID,
-			FullPayload:  fmt.Sprintf("%+v", entry.Payload),
-		})
-	}
-
-	return entries, nextPageToken, nil
+    return entries, resp.NextPageToken, nil
 }
+
 
