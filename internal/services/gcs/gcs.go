@@ -142,7 +142,7 @@ func (s *Service) HelpText() string {
 		return "r:Refresh  /:Filter  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
-		return "Esc/q:Back"
+		return "Enter:Browse Objects  Esc/q:Back"
 	}
 	if s.viewState == ViewObjects {
 		return "Enter:Open  Esc/q:Back/Up"
@@ -272,36 +272,37 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "r":
 				return s, s.Refresh()
 			case "enter":
-				// Handle bucket selection
+				// Handle bucket selection -> Go to Details
 				if s.selectedBucket == nil {
 					buckets := s.buckets
 					if idx := s.table.Cursor(); idx >= 0 && idx < len(buckets) {
 						s.selectedBucket = &buckets[idx]
-						// Switch to Object View
-						s.viewState = ViewObjects
-						s.currentPrefix = ""
-						s.loading = true
-						return s, s.fetchObjectsCmd()
-						// s.viewState = ViewDetail // Not fully implemented for objects yet
+						s.viewState = ViewDetail
 					}
-				}
-			case "l": // Logs
-				buckets := s.buckets
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(buckets) {
-					b := buckets[idx]
-					filter := fmt.Sprintf(`resource.type="gcs_bucket" AND resource.labels.bucket_name="%s"`, b.Name)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
 				}
 			}
 			s.table, cmd = s.table.Update(msg)
 			return s, cmd
 
+		} else if s.viewState == ViewDetail {
+			switch msg.String() {
+			case "q", "esc":
+				s.viewState = ViewList
+				s.selectedBucket = nil
+				return s, nil
+			case "enter":
+				// Go to Object Browser
+				s.viewState = ViewObjects
+				s.currentPrefix = ""
+				s.loading = true
+				return s, s.fetchObjectsCmd()
+			}
+
 		} else if s.viewState == ViewObjects {
 			switch msg.String() {
 			case "esc", "q":
 				if s.currentPrefix == "" {
-					s.viewState = ViewList
-					s.selectedBucket = nil
+					s.viewState = ViewDetail // Back to Details
 				} else {
 					s.currentPrefix = parentPrefix(s.currentPrefix)
 					s.loading = true
@@ -318,23 +319,12 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						s.loading = true
 						return s, s.fetchObjectsCmd()
 					} else {
-						// Open Object Details?
-						// For now, no-op or maybe ViewDetail if we implemented it for objects
 						s.selectedObject = &obj
-						// s.viewState = ViewDetail // Not fully implemented for objects yet
 					}
 				}
 			}
 			s.objectTable, cmd = s.objectTable.Update(msg)
 			return s, cmd
-
-		} else if s.viewState == ViewDetail {
-			switch msg.String() {
-			case "q", "esc":
-				s.viewState = ViewList
-				s.selectedBucket = nil
-				return s, nil
-			}
 		}
 	}
 
@@ -382,30 +372,44 @@ func (s *Service) renderDetailView() string {
 
 	b := s.selectedBucket
 
-	// Title
-	// Title
 	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s", b.Name))
 
 	// Details
-	details := fmt.Sprintf(`
-%s %s
-%s %s
-%s %s
+	content := fmt.Sprintf(`
+Name:      %s
+Location:  %s
+Class:     %s
+Created:   %s
 `,
-		styles.LabelStyle.Render("Location:"), styles.ValueStyle.Render(b.Location),
-		styles.LabelStyle.Render("Class:"), styles.ValueStyle.Render(b.StorageClass),
-		styles.LabelStyle.Render("Created:"), styles.ValueStyle.Render(b.Created.Format(time.RFC822)),
+		b.Name,
+		b.Location,
+		b.StorageClass,
+		b.Created.Format(time.RFC822),
 	)
 
 	// Wrap in a box
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		title,
-		details,
-		"",
-		styles.SubtleStyle.Render("Press 'q' or 'esc' to return"),
+	box := styles.BoxStyle.Copy().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.ColorSecondary).
+		Padding(1).
+		Width(80).
+		Render(content)
+
+	view := lipgloss.JoinVertical(lipgloss.Top,
+		styles.LabelStyle.Render("╭─ Bucket Details ─────────────────────────────────────────────╮"),
+		box,
 	)
 
-	return styles.FocusedBoxStyle.Render(content)
+	// Action Bar
+	actions := styles.HelpStyle.Render("Enter Browse Objects | q Back")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		"\n",
+		view,
+		"\n",
+		actions,
+	)
 }
 
 // -----------------------------------------------------------------------------

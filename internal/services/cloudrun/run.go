@@ -320,15 +320,6 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						s.viewState = ViewDetail
 					}
 				}
-			case "l": // Logs
-				if s.activeTab == TabServices {
-					svcs := s.services
-					if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
-						svc := svcs[idx]
-						filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, svc.Name)
-						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
-					}
-				}
 			}
 
 			if s.activeTab == TabServices {
@@ -409,7 +400,7 @@ func (s *Service) renderDetailView() string {
 	if svc.Status != StatusReady {
 		statusStyle = styles.ErrorStyle
 	}
-	status := statusStyle.Render(string(svc.Status))
+	status := statusStyle.Render("● " + string(svc.Status))
 
 	// Details
 	details := fmt.Sprintf(`
@@ -493,9 +484,15 @@ func (s *Service) fetchDataCmd(force bool) tea.Cmd {
 func (s *Service) updateTable(items []RunService) {
 	rows := make([]table.Row, len(items))
 	for i, item := range items {
+		status := string(item.Status)
+		if item.Status == StatusReady {
+			status = "Ready"
+		} else {
+			status = string(item.Status)
+		}
 		rows[i] = table.Row{
 			item.Name,
-			string(item.Status),
+			status,
 			item.Region,
 			item.URL,
 		}
@@ -530,10 +527,12 @@ func (s *Service) fetchFunctionsCmd(force bool) tea.Cmd {
 func (s *Service) updateFuncTable(items []Function) {
 	rows := make([]table.Row, len(items))
 	for i, item := range items {
+		state := item.State
+		// Plain text state
 		rows[i] = table.Row{
 			item.Name,
 			item.Region,
-			item.State,
+			state,
 			item.LastUpdated.Format("2006-01-02"),
 		}
 	}

@@ -207,13 +207,6 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.actionSource = ViewList
 					s.viewState = ViewConfirmation
 				}
-			case "l": // Logs
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.instances) {
-					inst := s.instances[idx]
-					// Cloud SQL filter uses database_id usually project:instance
-					filter := fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s:%s"`, s.projectID, inst.Name)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
-				}
 			}
 			s.table, cmd = s.table.Update(msg)
 			return s, cmd
@@ -337,9 +330,18 @@ func (s *Service) updateTable(instances []Instance) {
 		if state == "" {
 			state = "UNKNOWN"
 		}
+
+		if state == "RUNNABLE" {
+			state = "RUNNABLE"
+		} else if state == "STOPPED" || state == "FAILED" {
+			state = string(inst.State)
+		} else {
+			state = string(inst.State)
+		}
+
 		rows[i] = table.Row{
 			inst.Name,
-			state, // Plain string to fix alignment
+			state,
 			inst.DatabaseVersion,
 			inst.Region,
 			inst.PrimaryIP,

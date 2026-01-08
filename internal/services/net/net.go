@@ -382,7 +382,11 @@ func (s *Service) fetchFirewallsCmd() tea.Cmd {
 func (s *Service) updateNetworksTable() {
 	rows := make([]table.Row, len(s.networks))
 	for i, n := range s.networks {
-		rows[i] = table.Row{n.Name, n.Mode, n.IPv4Range, n.GatewayIPv4}
+		mode := n.Mode
+		if mode == "AUTO" {
+			mode = "AUTO"
+		}
+		rows[i] = table.Row{n.Name, mode, n.IPv4Range, n.GatewayIPv4}
 	}
 	s.networksTable.SetRows(rows)
 }
@@ -399,7 +403,13 @@ func (s *Service) updateFirewallsTable() {
 	rows := make([]table.Row, len(s.firewalls))
 	for i, f := range s.firewalls {
 		prio := fmt.Sprintf("%d", f.Priority)
-		rows[i] = table.Row{f.Name, f.Direction, f.Action, prio, f.Source, f.Target}
+		action := f.Action
+		if action == "ALLOW" {
+			action = "ALLOW"
+		} else if action == "DENY" {
+			action = "DENY"
+		}
+		rows[i] = table.Row{f.Name, f.Direction, action, prio, f.Source, f.Target}
 	}
 	s.firewallsTable.SetRows(rows)
 }

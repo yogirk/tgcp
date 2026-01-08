@@ -8,7 +8,7 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
 
 - **🚀 Fast Navigation**: Instant switching between services and views using keyboard shortcuts.
 - **🔐 Secure Authentication**: Uses Application Default Credentials (ADC) for seamless and secure login.
-- **🔀 Project Switcher**: Switch active projects at runtime using the Command Palette `:project switch`.
+- **🔀 Project Switcher**: Instant cross-project switching via Command Palette.
 - **⚡ Smart Caching**: Built-in caching layer to reduce API calls and improve responsiveness.
 - **☁️ Supported Services**:
     - **Compute Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration (splits Tmux pane automatically).

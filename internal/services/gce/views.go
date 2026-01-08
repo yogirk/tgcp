@@ -63,11 +63,11 @@ func renderStatus(state InstanceState) string {
 	str := string(state)
 	switch state {
 	case StateRunning:
-		return styles.SuccessStyle.Render("🟢 " + str)
+		return styles.SuccessStyle.Render("● " + str)
 	case StateStopped, StateTerminated:
-		return styles.WarningStyle.Render("🟡 " + str)
+		return styles.ErrorStyle.Render("● " + str)
 	default:
-		return styles.ErrorStyle.Render("🔴 " + str)
+		return styles.WarningStyle.Render("● " + str)
 	}
 }
 

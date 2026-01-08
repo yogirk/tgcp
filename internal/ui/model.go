@@ -14,7 +14,6 @@ import (
 	"github.com/rk/tgcp/internal/services/gce"
 	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/iam"
-	"github.com/rk/tgcp/internal/services/logging"
 	"github.com/rk/tgcp/internal/services/net"
 	"github.com/rk/tgcp/internal/ui/components"
 )
@@ -122,13 +121,6 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		netSvc.InitService(context.Background(), authState.ProjectID)
 	}
 	svcMap["net"] = netSvc
-
-	// Create Logging Service
-	logSvc := logging.NewService(cache)
-	if authState.ProjectID != "" {
-		logSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["logs"] = logSvc
 
 	// Initialize Components
 	sb := components.NewSidebar()
@@ -500,51 +492,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Navigation.SetCommands(cmds)
 		m.StatusBar.Message = "Select a project to switch..."
 		return m, nil
-
-	case core.SwitchToLogsMsg:
-		// Switch to Logging Service
-		m.ViewMode = ViewService
-		m.ActiveService = "logs"
-		// Sync Sidebar
-		for i, item := range m.Sidebar.Items {
-			if item.ShortName == "logs" {
-				m.Sidebar.Cursor = i
-				break
-			}
-		}
-
-		if svc, exists := m.ServiceMap["logs"]; exists {
-			// Cast to Logging Service to set filter
-			// We need a way to pass filter. Is it exposed?
-			// The interface Service doesn't have SetFilter.
-			// We can use type assertion.
-			if logSvc, ok := svc.(interface{ SetFilter(string) }); ok {
-				logSvc.SetFilter(msg.Filter)
-			}
-
-			svc.Reset()
-			svc.Blur()
-			m.CurrentSvc = svc
-
-			// Sync Window Size
-			if m.Width > 0 && m.Height > 0 {
-				newModel, _ := svc.Update(tea.WindowSizeMsg{
-					Width:  m.Width,
-					Height: m.Height,
-				})
-				if updatedSvc, ok := newModel.(services.Service); ok {
-					svc = updatedSvc
-					m.ServiceMap["logs"] = svc
-					m.CurrentSvc = svc
-				}
-			}
-
-			// Trigger Refresh
-			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
-		}
-		m.Focus = FocusSidebar
-		m.Sidebar.Active = true
-		return m, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
