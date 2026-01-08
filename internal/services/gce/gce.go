@@ -235,7 +235,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					inst := instances[idx]
 					filter := fmt.Sprintf(`resource.type="gce_instance" AND resource.labels.instance_id="%s"`, inst.ID)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gce"} }
 				}
 			}
 			// Forward to table
