@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rk/tgcp/internal/core"
 	compute "google.golang.org/api/compute/v1"
@@ -59,15 +60,58 @@ func (c *Client) ListInstances(projectID string) ([]Instance, error) {
 				parts := strings.Split(inst.MachineType, "/")
 				machineType := parts[len(parts)-1]
 
+				// Parse Disks
+				var disks []Disk
+				for _, d := range inst.Disks {
+					// d.Type is not always populated or is a URL
+					// If boot disk, it might be in InitializeParams but AttachedDisk also has DiskSizeGb
+					diskType := "pd-standard" // Default
+					// Try to guess from InitializeParams if exists
+					if d.InitializeParams != nil && d.InitializeParams.DiskType != "" {
+						// Format: zones/.../diskTypes/pd-ssd
+						dtParts := strings.Split(d.InitializeParams.DiskType, "/")
+						diskType = dtParts[len(dtParts)-1]
+					}
+
+					disks = append(disks, Disk{
+						Name:   d.DeviceName,
+						SizeGB: d.DiskSizeGb,
+						Type:   diskType,
+					})
+				}
+
+				// Parse Creation Time
+				creationTime, _ := time.Parse(time.RFC3339, inst.CreationTimestamp)
+
+				// Determine OS Image
+				osImage := "Unknown"
+				for _, d := range inst.Disks {
+					if d.Boot {
+						// Try InitializeParams first
+						if d.InitializeParams != nil && d.InitializeParams.SourceImage != "" {
+							parts := strings.Split(d.InitializeParams.SourceImage, "/")
+							osImage = parts[len(parts)-1]
+						} else if len(d.Licenses) > 0 {
+							// Fallback to licenses
+							parts := strings.Split(d.Licenses[0], "/")
+							osImage = parts[len(parts)-1]
+						}
+						break
+					}
+				}
+
 				instances = append(instances, Instance{
-					ID:          fmt.Sprintf("%d", inst.Id),
-					Name:        inst.Name,
-					Zone:        zone,
-					State:       InstanceState(inst.Status), // Simplified cast
-					MachineType: machineType,
-					InternalIP:  internalIP,
-					ExternalIP:  externalIP,
-					// Tags: inst.Tags.Items, // Check if Tags struct exists
+					ID:           fmt.Sprintf("%d", inst.Id),
+					Name:         inst.Name,
+					Zone:         zone,
+					State:        InstanceState(inst.Status), // Simplified cast
+					MachineType:  machineType,
+					InternalIP:   internalIP,
+					ExternalIP:   externalIP,
+					CreationTime: creationTime,
+					Tags:         inst.Tags.Items,
+					Disks:        disks,
+					OSImage:      osImage,
 				})
 			}
 		}

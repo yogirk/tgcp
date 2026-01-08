@@ -3,6 +3,7 @@ package gce
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rk/tgcp/internal/styles"
@@ -22,11 +23,31 @@ func (s *Service) renderDetailView() string {
 	doc.WriteString("\n\n")
 
 	// Instance Details Section
+	// Calculate Total Disk Size
+	var totalDisk int64
+	for _, d := range i.Disks {
+		totalDisk += d.SizeGB
+	}
+
+	// Calculate Age
+	// Simple duration format: Xd Yh
+	age := time.Since(i.CreationTime)
+	days := int(age.Hours() / 24)
+	ageStr := fmt.Sprintf("%d days ago", days)
+	if days == 0 {
+		hours := int(age.Hours())
+		ageStr = fmt.Sprintf("%d hours ago", hours)
+	}
+
 	detailsContent := fmt.Sprintf(`
 Name:           %s
 Status:         %s
 Zone:           %s
 Machine Type:   %s
+OS Image:       %s
+Disk Size:      %d GB
+Created:        %s
+Estimated Cost: %s
 Internal IP:    %s
 External IP:    %s
 `,
@@ -34,6 +55,10 @@ External IP:    %s
 		renderStatus(i.State),
 		i.Zone,
 		i.MachineType,
+		i.OSImage,
+		totalDisk,
+		ageStr,
+		EstimateCost(i.MachineType, i.Zone, i.Disks),
 		i.InternalIP,
 		i.ExternalIP,
 	)
@@ -65,9 +90,15 @@ func renderStatus(state InstanceState) string {
 	case StateRunning:
 		return styles.SuccessStyle.Render("● " + str)
 	case StateStopped, StateTerminated:
-		return styles.ErrorStyle.Render("● " + str)
-	default:
+		label := str
+		if state == StateTerminated {
+			label = "STOP"
+		}
+		return styles.ErrorStyle.Render("● " + label)
+	case StateProvisioning, StateStaging, StateStopping, StateSuspending, StateRepairing:
 		return styles.WarningStyle.Render("● " + str)
+	default:
+		return styles.SubtextStyle.Render("● " + str)
 	}
 }
 

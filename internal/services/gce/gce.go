@@ -56,16 +56,8 @@ type Service struct {
 }
 
 func NewService(cache *core.Cache) *Service {
-	// Table Setup (same as before)
 	// Table Setup
-	columns := []table.Column{
-		{Title: "Name", Width: 30},
-		{Title: "Status", Width: 10},
-		{Title: "Zone", Width: 12},
-		{Title: "Internal IP", Width: 15},
-		{Title: "External IP", Width: 15},
-		{Title: "ID", Width: 20},
-	}
+	columns := GetGCEColumns()
 
 	t := table.New(
 		table.WithColumns(columns),

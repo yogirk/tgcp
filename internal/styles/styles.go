@@ -75,6 +75,8 @@ var (
 	SubtleStyle = lipgloss.NewStyle().
 			Foreground(ColorSubtext)
 
+	SubtextStyle = SubtleStyle // Alias for SubtextStyle used in views
+
 	SuccessStyle = lipgloss.NewStyle().
 			Foreground(ColorSuccess)
 

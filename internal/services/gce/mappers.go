@@ -2,25 +2,37 @@ package gce
 
 import (
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
 )
 
 // InstanceToRow converts an Instance model to a table.Row
 func InstanceToRow(i Instance) table.Row {
-	statusStyle := lipgloss.NewStyle()
+	var statusStr string
 	switch i.State {
 	case StateRunning:
-		statusStyle = statusStyle.Foreground(styles.ColorSuccess) // Green
-	case StateStopped, StateTerminated:
-		statusStyle = statusStyle.Foreground(styles.ColorSubtext) // Grey/Dim
+		statusStr = "🟢 " + string(i.State)
+	case StateStopped:
+		statusStr = "🔴 " + string(i.State)
+	case StateTerminated:
+		statusStr = "🔴 STOP"
+	case StateProvisioning, StateStaging, StateStopping, StateSuspending, StateRepairing:
+		statusStr = "🔄 " + string(i.State)
 	default:
-		statusStyle = statusStyle.Foreground(styles.ColorWarning) // Orange
+		statusStr = "⚪ " + string(i.State)
 	}
 
+	// Calculate Total Disk Size (Optional: kept calculation if needed, but removing from row)
+	/*
+		var totalDisk int64
+		for _, d := range i.Disks {
+			totalDisk += d.SizeGB
+		}
+		diskStr := fmt.Sprintf("%dGB", totalDisk)
+	*/
+
+	// Column Order: Name, Status, Zone, Internal IP, External IP, ID
 	return table.Row{
 		i.Name,
-		string(i.State), // Remove style for debug
+		statusStr,
 		i.Zone,
 		i.InternalIP,
 		i.ExternalIP,
@@ -28,15 +40,15 @@ func InstanceToRow(i Instance) table.Row {
 	}
 }
 
-// BuildColumns returns the table column definitions
-func BuildColumns(width int) []table.Column {
+// GetGCEColumns returns the table column definitions
+func GetGCEColumns() []table.Column {
 	// Simple responsive logic can go here
 	return []table.Column{
-		{Title: "ID", Width: 20}, // Hidden mostly
-		{Title: "Name", Width: 30},
-		{Title: "Zone", Width: 15},
-		{Title: "Status", Width: 12},
-		{Title: "Internal IP", Width: 15},
-		{Title: "External IP", Width: 15},
+		{Title: "VM Name", Width: 30},
+		{Title: "VM STATE", Width: 20}, // Increased width to prevent dot-only issue
+		{Title: "GCP Zone", Width: 15},
+		{Title: "Int. IP", Width: 15},
+		{Title: "Ext. IP", Width: 15},
+		{Title: "ID", Width: 20}, // Hidden or at end
 	}
 }
