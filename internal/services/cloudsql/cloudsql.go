@@ -92,7 +92,7 @@ func (s *Service) ShortName() string {
 
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "r:Refresh  s:Start  x:Stop  Ent:Detail"
+		return "r:Refresh  s:Start  x:Stop  l:Logs  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
 		return "Esc/q:Back  s:Start  x:Stop"
@@ -212,7 +212,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					inst := s.instances[idx]
 					// Cloud SQL filter uses database_id usually project:instance
 					filter := fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s:%s"`, s.projectID, inst.Name)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "sql"} }
 				}
 			}
 			s.table, cmd = s.table.Update(msg)
