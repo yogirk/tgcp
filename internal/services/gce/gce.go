@@ -109,7 +109,7 @@ func (s *Service) ShortName() string {
 
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "r:Refresh  /:Filter  s:Start  x:Stop  h:SSH  i:Logs  Ent:Detail"
+		return "r:Refresh  /:Filter  s:Start  x:Stop  h:SSH  l:Logs  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
 		return "Esc/q:Back  s:Start  x:Stop  h:SSH"
@@ -287,12 +287,12 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					return s, s.SSHCmd(instances[idx])
 				}
-			case "i": // Logs (Changed from l)
+			case "l": // Logs (Changed from i)
 				instances := s.getCurrentInstances()
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					inst := instances[idx]
 					filter := fmt.Sprintf(`resource.type="gce_instance" AND resource.labels.instance_id="%s"`, inst.ID)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter} }
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gce"} }
 				}
 			}
 			// Forward to table

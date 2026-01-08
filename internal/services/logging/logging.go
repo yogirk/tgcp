@@ -36,6 +36,9 @@ type Service struct {
 
 	// Cache
 	cache *core.Cache
+
+	// Navigation
+	returnTo string
 }
 
 func NewService(cache *core.Cache) *Service {
@@ -98,8 +101,11 @@ func (s *Service) HelpText() string {
 		return "Esc:Cancel  Enter:Apply"
 	}
 	base := "r:Refresh  /:Filter  Esc/q:Back"
+	if s.returnTo != "" {
+		base = fmt.Sprintf("Esc:Back to %s  r:Refresh  /:Filter", s.returnTo)
+	}
 	if s.nextPageToken != "" {
-		base = "r:Refresh  /:Filter  n:Next Page  Esc/q:Back"
+		base += "  n:Next Page"
 	}
 	return base
 }
@@ -197,6 +203,11 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if s.filtering {
 			switch msg.String() {
 			case "esc":
+				if s.returnTo != "" {
+					dest := s.returnTo
+					s.returnTo = "" // Reset
+					return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
+				}
 				s.filtering = false
 				s.filterInput.Blur()
 				// Revert to valid filter or keep?
@@ -243,6 +254,12 @@ func (s *Service) SetFilter(filter string) {
 	// If we want to auto-apply, we might need to trigger refresh, but this is just setting state.
 	// The caller (SwitchToLogsMsg) calls Refresh() right after.
 }
+
+// SetReturnTo sets the service to return to when Esc is pressed
+func (s *Service) SetReturnTo(service string) {
+	s.returnTo = service
+}
+
 
 func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 	return func() tea.Msg {

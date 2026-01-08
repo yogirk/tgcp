@@ -521,6 +521,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if logSvc, ok := svc.(interface{ SetFilter(string) }); ok {
 				logSvc.SetFilter(msg.Filter)
 			}
+			if logSvc, ok := svc.(interface{ SetReturnTo(string) }); ok {
+				logSvc.SetReturnTo(msg.Source)
+			}
 
 			svc.Reset()
 			svc.Blur()
@@ -540,6 +543,47 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Trigger Refresh
+			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+		}
+		m.Focus = FocusSidebar
+		m.Sidebar.Active = true
+		return m, tea.Batch(cmds...)
+
+	case core.SwitchToServiceMsg:
+		// Switch to a specific service
+		m.ViewMode = ViewService
+		m.ActiveService = msg.Service
+		// Sync Sidebar
+		for i, item := range m.Sidebar.Items {
+			if item.ShortName == msg.Service {
+				m.Sidebar.Cursor = i
+				break
+			}
+		}
+
+		if svc, exists := m.ServiceMap[msg.Service]; exists {
+			svc.Reset()
+			svc.Blur() // Focus sidebar initially? or Focus service?
+			// If returning from logs, maybe focus service directly?
+			// Let's stick to standard flow: Focus Sidebar active.
+			// But if user pressed Esc in logs, they expect to be back in the list, possibly focused on list?
+			// For now, consistent behavior: Sidebar active.
+			m.CurrentSvc = svc
+
+			// Sync Window Size
+			if m.Width > 0 && m.Height > 0 {
+				newModel, _ := svc.Update(tea.WindowSizeMsg{
+					Width:  m.Width,
+					Height: m.Height,
+				})
+				if updatedSvc, ok := newModel.(services.Service); ok {
+					svc = updatedSvc
+					m.ServiceMap[msg.Service] = svc
+					m.CurrentSvc = svc
+				}
+			}
+
+			// Trigger Refresh?
 			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 		}
 		m.Focus = FocusSidebar

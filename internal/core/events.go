@@ -12,6 +12,13 @@ type StatusMsg struct {
 type LastUpdatedMsg time.Time
 
 // SwitchToLogsMsg requests a context switch to the logging service
+// SwitchToLogsMsg requests a context switch to the logging service
 type SwitchToLogsMsg struct {
 	Filter string
+	Source string // The short name of the service initiating the switch
+}
+
+// SwitchToServiceMsg requests a context switch to a specific service
+type SwitchToServiceMsg struct {
+	Service string // The short name of the service to switch to
 }
