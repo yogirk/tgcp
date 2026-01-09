@@ -529,13 +529,17 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				logSvc.SetHeading(msg.Heading)
 			}
 
-			svc.Blur()
+			svc.Focus()
 			m.CurrentSvc = svc
 
 			// Sync Window Size
 			if m.Width > 0 && m.Height > 0 {
+				availWidth := m.Width
+				// We force sidebar visible below, so account for it now
+				availWidth -= m.Sidebar.Width
+				
 				newModel, _ := svc.Update(tea.WindowSizeMsg{
-					Width:  m.Width,
+					Width:  availWidth,
 					Height: m.Height,
 				})
 				if updatedSvc, ok := newModel.(services.Service); ok {
@@ -548,8 +552,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Trigger Refresh
 			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 		}
-		m.Focus = FocusSidebar
-		m.Sidebar.Active = true
+		m.Focus = FocusMain
+		m.Sidebar.Active = false
+		m.Sidebar.Visible = true
 		return m, tea.Batch(cmds...)
 
 	case core.SwitchToServiceMsg:
@@ -575,8 +580,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Sync Window Size
 			if m.Width > 0 && m.Height > 0 {
+				availWidth := m.Width
+				if m.Sidebar.Visible {
+					availWidth -= m.Sidebar.Width
+				}
 				newModel, _ := svc.Update(tea.WindowSizeMsg{
-					Width:  m.Width,
+					Width:  availWidth, // Use available width
 					Height: m.Height,
 				})
 				if updatedSvc, ok := newModel.(services.Service); ok {
@@ -622,8 +631,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Sync Window Size immediately so table renders correctly
 				if m.Width > 0 && m.Height > 0 {
+					availWidth := m.Width
+					if m.Sidebar.Visible {
+						availWidth -= m.Sidebar.Width
+					}
 					newModel, _ := svc.Update(tea.WindowSizeMsg{
-						Width:  m.Width,
+						Width:  availWidth,
 						Height: m.Height,
 					})
 					if updatedSvc, ok := newModel.(services.Service); ok {

@@ -77,12 +77,12 @@ func (c *Client) ListEntries(
         OrderBy:       "timestamp desc", // Equivalent to NewestFirst
     })
 
-    resp, err := req.Context(ctx).Do()
-    if err != nil {
-        return nil, "", fmt.Errorf("failed to list entries: %w", err)
-    }
+	resp, err := req.Context(ctx).Do()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to list entries: %w", err)
+	}
 
-    var entries []LogEntry
+	var entries []LogEntry
     for _, entry := range resp.Entries {
         // Parse Timestamp
         ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)

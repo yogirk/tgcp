@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rk/tgcp/internal/core"
@@ -22,7 +24,7 @@ type tickMsg time.Time
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	viewport  viewport.Model
 
 	// UI Components
 	filterInput textinput.Model
@@ -33,6 +35,8 @@ type Service struct {
 	loading       bool
 	err           error
 	nextPageToken string
+	currentToken  string   // Token used for current page
+	tokenStack    []string // History of tokens for "Previous" function
 
 	// Cache
 	cache *core.Cache
@@ -44,40 +48,24 @@ type Service struct {
 
 func NewService(cache *core.Cache) *Service {
 	// Table Setup
-	t := table.New(
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Custom Table Styles
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	
-	// Add bottom border to all cells for "clear separated line"
-	st.Cell = st.Cell.Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(0, 1) // Add horizontal padding for "clear indentation"
-
-	t.SetStyles(st)
+	// Viewport Setup
+	vp := viewport.New(0, 0)
+	vp.Style = lipgloss.NewStyle().
+		PaddingRight(0)
 
 	// Filter Input Setup
 	ti := textinput.New()
 	ti.Placeholder = "Filter (e.g. severity>=ERROR)"
 	ti.Prompt = "/ "
-	ti.CharLimit = 200
-	ti.Width = 60
+	ti.CharLimit = 1000
+	ti.Width = 60 // Initial default
 	ti.SetValue("") // Default to empty (triggers last 30m in api.go)
 
 	s := &Service{
-		table:       t,
+		viewport:    vp,
 		filterInput: ti,
 		cache:       cache,
 	}
-	s.setColumns(false) // Default columns
 	return s
 }
 
@@ -98,7 +86,10 @@ func (s *Service) HelpText() string {
 		base = fmt.Sprintf("Esc:Back to %s  r:Refresh  /:Filter", s.returnTo)
 	}
 	if s.nextPageToken != "" {
-		base += "  n:Next Page"
+		base += "  n:Next"
+	}
+	if len(s.tokenStack) > 0 {
+		base += "  p:Prev"
 	}
 	return base
 }
@@ -107,26 +98,14 @@ func (s *Service) HelpText() string {
 
 // Focus handles input focus
 func (s *Service) Focus() {
-	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
+	// table was focused, nothing to do for viewport which always accepts keys if forwarded
+
 }
 
 // Blur handles loss of input focus
 func (s *Service) Blur() {
-	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")). // Dark grey
-		Bold(false)
-	s.table.SetStyles(st)
+	// table blur logic removed
+
 }
 
 // Msg types
@@ -178,7 +157,8 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.loading = false
 		s.entries = msg.entries
 		s.nextPageToken = msg.nextToken
-		s.updateTable(s.entries)
+		// Current token is already set before fetch
+		s.renderLogs()
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
@@ -191,7 +171,11 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if newHeight < 5 {
 			newHeight = 5
 		}
-		s.table.SetHeight(newHeight)
+		s.viewport.Width = msg.Width
+		s.viewport.Height = newHeight
+		s.filterInput.Width = msg.Width - 4 // Dynamic filter width
+		s.renderLogs() // Re-render triggers wrapping
+
 
 	case tea.KeyMsg:
 		// FILTERING MODE
@@ -230,12 +214,33 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "n":
 			if s.nextPageToken != "" {
 				s.loading = true
-				return s, s.fetchEntriesCmd(s.nextPageToken)
+				// Push current token to stack
+				s.tokenStack = append(s.tokenStack, s.currentToken)
+				// Update current token
+				s.currentToken = s.nextPageToken
+				return s, s.fetchEntriesCmd(s.currentToken)
 			}
-		// case "enter": // View Details
-		}
-		
-		s.table, cmd = s.table.Update(msg)
+		case "p":
+			if len(s.tokenStack) > 0 {
+				s.loading = true
+				// Pop last token
+				lastIdx := len(s.tokenStack) - 1
+				prevToken := s.tokenStack[lastIdx]
+				s.tokenStack = s.tokenStack[:lastIdx]
+				
+				// Update current token
+				s.currentToken = prevToken
+				return s, s.fetchEntriesCmd(s.currentToken)
+			}
+		case "esc", "q":
+			if s.returnTo != "" {
+				dest := s.returnTo
+				s.returnTo = "" // Reset
+				return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
+			}
+			return s, nil // Let parent handle if no returnTo? Or just Consume?
+		}		
+		s.viewport, cmd = s.viewport.Update(msg)
 		return s, cmd
 	}
 
@@ -245,7 +250,8 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // SetFilter sets the filter string (used by other components to jump to logs)
 func (s *Service) SetFilter(filter string) {
 	s.filterInput.SetValue(filter)
-	s.filtering = true // optional: enter filtering mode or just apply?
+	s.filterInput.SetCursor(0) // Scroll to start so user sees the beginning context
+	s.filtering = false // Just apply the filter, don't enter edit mode
 	// If we want to auto-apply, we might need to trigger refresh, but this is just setting state.
 	// The caller (SwitchToLogsMsg) calls Refresh() right after.
 }
@@ -258,29 +264,54 @@ func (s *Service) SetReturnTo(service string) {
 // SetHeading sets the custom heading and adjusts columns
 func (s *Service) SetHeading(heading string) {
 	s.heading = heading
-	s.setColumns(heading != "")
+	// Re-render handled by next update/fetch or we can force it if we had entries
+	if len(s.entries) > 0 {
+		s.renderLogs()
+	}
 }
 
-func (s *Service) setColumns(minimal bool) {
-	var cols []table.Column
-	if minimal {
-		cols = []table.Column{
-			{Title: "Time", Width: 25},
-			{Title: "Severity", Width: 10},
-			{Title: "Location", Width: 15},
-			{Title: "Payload", Width: 80}, // Expanded payload
-		}
-	} else {
-		cols = []table.Column{
-			{Title: "Time", Width: 25},
-			{Title: "Severity", Width: 10},
-			{Title: "Resource", Width: 20},
-			{Title: "Name", Width: 20},
-			{Title: "Location", Width: 15},
-			{Title: "Payload", Width: 60},
-		}
+func (s *Service) renderLogs() {
+	doc := strings.Builder{}
+
+	// Define Styles
+	metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Grey for timestamp/location
+	msgStyle := lipgloss.NewStyle().Foreground(styles.ColorText)
+
+	// Determine effective width for wrapping
+	// Viewport width might be 0 initially
+	wrapWidth := s.viewport.Width - 4
+	if wrapWidth < 20 {
+		wrapWidth = 60 // fallback
 	}
-	s.table.SetColumns(cols)
+
+	for _, e := range s.entries {
+		ts := e.Timestamp.Local().Format("2006-01-02 15:04:05")
+		sev := renderSeverity(e.Severity)
+
+		// Header Line: TIMESTAMP  SEVERITY  LOCATION
+		// Combine location info
+		loc := e.Location
+		if s.heading == "" {
+			if e.ResourceType != "" {
+				loc = fmt.Sprintf("%s %s %s", e.ResourceType, e.ResourceName, e.Location)
+			}
+		}
+
+		header := fmt.Sprintf("%s  %s  %s", ts, sev, loc)
+		doc.WriteString(metaStyle.Render(header) + "\n")
+
+		// Message Body (Wrapped)
+		// We use lipgloss to wrap the payload to the viewport width
+		payload := e.Payload
+		wrapped := msgStyle.Width(wrapWidth).Render(payload)
+		
+		doc.WriteString(wrapped + "\n")
+		
+		// Separator
+		doc.WriteString(metaStyle.Render(strings.Repeat("-", wrapWidth)) + "\n")
+	}
+
+	s.viewport.SetContent(doc.String())
 }
 
 
@@ -291,7 +322,7 @@ func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 		}
 
 		filter := s.filterInput.Value()
-		pageSize := 20 // Requirement: 10 entries by default
+		pageSize := 12 // Requested constraint
 		
 		entries, nextToken, err := s.client.ListEntries(context.Background(), filter, pageSize, token)
 		if err != nil {
@@ -303,44 +334,26 @@ func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 
 func (s *Service) Refresh() tea.Cmd {
 	s.loading = true
+	// Refresh keeps current page? Or resets to top?
+	// Usually Refresh means "give me latest", which effectively means page 1
+	// If user wants to reload current page, that's different.
+	// We'll reset to page 1 for standard "Refresh" behavior
+	s.currentToken = ""
+	s.tokenStack = nil
 	return s.fetchEntriesCmd("")
 }
 
 func (s *Service) Reset() {
 	s.err = nil
-	s.table.SetCursor(0)
-	s.SetHeading("") // Reset heading and columns
+	s.viewport.GotoTop()
+	s.SetHeading("")
+	s.currentToken = ""
+	s.tokenStack = nil
 }
 
 func (s *Service) IsRootView() bool {
 	return true
 }
 
-func (s *Service) updateTable(entries []LogEntry) {
-	rows := make([]table.Row, len(entries))
-	for i, e := range entries {
-		ts := e.Timestamp.Local().Format("2006-01-02 15:04:05")
-		sev := renderSeverity(e.Severity)
+// updateTable removed
 
-		if s.heading != "" {
-			// Minimal columns
-			rows[i] = table.Row{
-				ts,
-				sev,
-				e.Location,
-				e.Payload,
-			}
-		} else {
-			// Full columns
-			rows[i] = table.Row{
-				ts,
-				sev,
-				e.ResourceType,
-				e.ResourceName,
-				e.Location,
-				e.Payload,
-			}
-		}
-	}
-	s.table.SetRows(rows)
-}
