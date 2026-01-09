@@ -514,6 +514,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if svc, exists := m.ServiceMap["logs"]; exists {
+			svc.Reset()
 			// Cast to Logging Service to set filter
 			// We need a way to pass filter. Is it exposed?
 			// The interface Service doesn't have SetFilter.
@@ -524,8 +525,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if logSvc, ok := svc.(interface{ SetReturnTo(string) }); ok {
 				logSvc.SetReturnTo(msg.Source)
 			}
+			if logSvc, ok := svc.(interface{ SetHeading(string) }); ok {
+				logSvc.SetHeading(msg.Heading)
+			}
 
-			svc.Reset()
 			svc.Blur()
 			m.CurrentSvc = svc
 
