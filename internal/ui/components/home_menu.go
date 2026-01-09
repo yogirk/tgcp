@@ -15,16 +15,24 @@ type HomeMenuModel struct {
 func NewHomeMenu() HomeMenuModel {
 	return HomeMenuModel{
 		Items: []ServiceItem{
-			{Name: "Overview", ShortName: "overview", Active: true},
-			{Name: "Google Compute Engine (GCE)", ShortName: "gce"},
-			{Name: "Disks (Block Storage)", ShortName: "disks"},
-			{Name: "Kubernetes Engine (GKE)", ShortName: "gke"},
-			{Name: "Cloud SQL", ShortName: "sql"},
-			{Name: "Identity & Access Management (IAM)", ShortName: "iam"},
-			{Name: "Cloud Run", ShortName: "run"},
-			{Name: "Cloud Storage (GCS)", ShortName: "gcs"},
-			{Name: "BigQuery", ShortName: "bq"},
-			{Name: "Networking", ShortName: "net"},
+			{Name: "Overview (Command Center)", ShortName: "overview", Active: true},
+			{Name: "Compute Engine (GCE)", ShortName: "gce"},    // 🖥️
+			{Name: "Kubernetes Engine (GKE)", ShortName: "gke"}, // ☸️
+			{Name: "Disks (Block Storage)", ShortName: "disks"}, // 💾
+			{Name: "Cloud SQL", ShortName: "sql"},               // 🗄️
+			{Name: "IAM & Admin", ShortName: "iam"},             // 🛡️
+			{Name: "Cloud Run", ShortName: "run"},               // 🏃
+			{Name: "Cloud Storage (GCS)", ShortName: "gcs"},     // 🪣
+			{Name: "BigQuery", ShortName: "bq"},                 // 🔍
+			{Name: "VPC Network", ShortName: "net"},             // 🕸️
+			// New Services
+			{Name: "Pub/Sub", ShortName: "pubsub"},            // 📡
+			{Name: "Memorystore (Redis)", ShortName: "redis"}, // 🧠
+			{Name: "Spanner", ShortName: "spanner"},           // 🌍
+			{Name: "Bigtable", ShortName: "bigtable"},         // 🥞
+			{Name: "Dataflow", ShortName: "dataflow"},         // 🌊
+			{Name: "Dataproc", ShortName: "dataproc"},         // 🐘
+			{Name: "Firestore", ShortName: "firestore"},       // 🔥
 		},
 		Cursor:    0,
 		IsFocused: true,

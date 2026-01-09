@@ -65,7 +65,7 @@ func renderLandingPage(m MainModel) string {
 
 	// User Info Box
 	userInfo := fmt.Sprintf(
-		"👤 User: %s\n📁 Project: %s",
+		"👤 User: %s    📁 Project: %s",
 		m.AuthState.UserEmail,
 		m.AuthState.ProjectID,
 	)

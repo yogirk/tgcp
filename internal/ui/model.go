@@ -9,15 +9,22 @@ import (
 	"github.com/rk/tgcp/internal/core"
 	"github.com/rk/tgcp/internal/services"
 	"github.com/rk/tgcp/internal/services/bigquery"
+	"github.com/rk/tgcp/internal/services/bigtable"
 	"github.com/rk/tgcp/internal/services/cloudrun"
 	"github.com/rk/tgcp/internal/services/cloudsql"
+	"github.com/rk/tgcp/internal/services/dataflow"
+	"github.com/rk/tgcp/internal/services/dataproc"
 	"github.com/rk/tgcp/internal/services/disks"
+	"github.com/rk/tgcp/internal/services/firestore"
 	"github.com/rk/tgcp/internal/services/gce"
 	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/gke"
 	"github.com/rk/tgcp/internal/services/iam"
 	"github.com/rk/tgcp/internal/services/net"
 	"github.com/rk/tgcp/internal/services/overview"
+	"github.com/rk/tgcp/internal/services/pubsub"
+	"github.com/rk/tgcp/internal/services/redis"
+	"github.com/rk/tgcp/internal/services/spanner"
 	"github.com/rk/tgcp/internal/ui/components"
 )
 
@@ -103,6 +110,55 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		diskSvc.InitService(context.Background(), authState.ProjectID)
 	}
 	svcMap["disks"] = diskSvc
+
+	// Create Pub/Sub Service
+	psSvc := pubsub.NewService(cache)
+	if authState.ProjectID != "" {
+		psSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["pubsub"] = psSvc
+
+	// Create Redis Service
+	redisSvc := redis.NewService(cache)
+	if authState.ProjectID != "" {
+		redisSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["redis"] = redisSvc
+
+	// Create Spanner Service
+	spannerSvc := spanner.NewService(cache)
+	if authState.ProjectID != "" {
+		spannerSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["spanner"] = spannerSvc
+
+	// Create Bigtable Service
+	btSvc := bigtable.NewService(cache)
+	if authState.ProjectID != "" {
+		btSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["bigtable"] = btSvc
+
+	// Create Dataflow Service
+	dfSvc := dataflow.NewService(cache)
+	if authState.ProjectID != "" {
+		dfSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["dataflow"] = dfSvc
+
+	// Create Dataproc Service
+	dpSvc := dataproc.NewService(cache)
+	if authState.ProjectID != "" {
+		dpSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["dataproc"] = dpSvc
+
+	// Create Firestore Service
+	fsSvc := firestore.NewService(cache)
+	if authState.ProjectID != "" {
+		fsSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["firestore"] = fsSvc
 
 	// Create Cloud SQL Service
 	sqlSvc := cloudsql.NewService(cache)

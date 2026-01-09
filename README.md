@@ -15,11 +15,25 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
     - **Cloud SQL**: Monitor database instances, check status and configurations, start/stop.
     - **IAM**: Audit service accounts and policies.
     - **Kubernetes Engine (GKE)**: View Clusters and Node Pools. Launch **k9s** instantly with `K`.
+    - **Disks**: Manage Persistent Disks and identify **Orphaned** (unused) storage.
+    - **Comput Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration.
     - **Cloud Run**: List services, view revisions, and explore **Cloud Functions** in a dedicated tab.
-    - **Cloud Storage (GCS)**: Browse buckets and navigate objects with a built-in **Object Browser** (read-only).
-    - **BigQuery**: Inspect datasets, drill down into tables, and view schemas.
+    - **Cloud Storage (GCS)**: Browse buckets and navigate objects.
+    - **Networking**: VPC Networks and Subnets.
+    - **Data & Databases**:
+        - **Cloud SQL**: Monitor database instances.
+        - **Spanner**: High-performance database clusters.
+        - **Bigtable**: Wide-column NoSQL storage.
+        - **Firestore**: Document database.
+        - **Memorystore (Redis)**: In-memory data store.
+    - **Messaging & Analytics**:
+        - **Pub/Sub**: Topics, Subscriptions, and Backlog monitoring.
+        - **BigQuery**: Datasets and Tables.
+        - **Dataflow**: Stream/Batch job monitoring.
+        - **Dataproc**: Managed Spark/Hadoop clusters.
 - **🔍 Filtering**: Real-time fuzzy filtering for all resource lists.
 - **🛡️ Safety First**: Confirmation dialogs for all state-changing actions.
+- **📖 Comprehensive Guide**: See [FEATURES.md](FEATURES.md) for a deep dive into all capabilities.
 
 ## Recommended Font
 

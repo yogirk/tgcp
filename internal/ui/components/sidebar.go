@@ -36,6 +36,13 @@ func NewSidebar() SidebarModel {
 			{Name: "Cloud Storage", ShortName: "gcs"},
 			{Name: "BigQuery", ShortName: "bq"},
 			{Name: "Networking", ShortName: "net"},
+			{Name: "Pub/Sub", ShortName: "pubsub"},
+			{Name: "Memorystore", ShortName: "redis"},
+			{Name: "Spanner", ShortName: "spanner"},
+			{Name: "Bigtable", ShortName: "bigtable"},
+			{Name: "Dataflow", ShortName: "dataflow"},
+			{Name: "Dataproc", ShortName: "dataproc"},
+			{Name: "Firestore", ShortName: "firestore"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start
