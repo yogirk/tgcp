@@ -14,6 +14,7 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
     - **Compute Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration (splits Tmux pane automatically).
     - **Cloud SQL**: Monitor database instances, check status and configurations, start/stop.
     - **IAM**: Audit service accounts and policies.
+    - **Kubernetes Engine (GKE)**: View Clusters and Node Pools. Launch **k9s** instantly with `K`.
     - **Cloud Run**: List services, view revisions, and explore **Cloud Functions** in a dedicated tab.
     - **Cloud Storage (GCS)**: Browse buckets and navigate objects with a built-in **Object Browser** (read-only).
     - **BigQuery**: Inspect datasets, drill down into tables, and view schemas.
@@ -106,6 +107,7 @@ ui:
 | `s` | **Start** resource | GCE, Cloud SQL |
 | `x` | **Stop** resource | GCE, Cloud SQL |
 | `h` | **SSH** into instance | GCE |
+| `K` | **Launch k9s** | GKE |
 | `[` / `]` | **Switch Tabs** | Cloud Run (Services/Functions) |
 | `Enter` | **Drill Down** / **Open** | GCS Object Browser, BigQuery |
 | `Esc` | **Go Back** / **Up Level** | GCS Object Browser, BigQuery |

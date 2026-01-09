@@ -28,6 +28,7 @@ func NewSidebar() SidebarModel {
 		Items: []ServiceItem{
 			{Name: "Overview", ShortName: "overview", Active: true},
 			{Name: "Compute Engine", ShortName: "gce"},
+			{Name: "Kubernetes Engine", ShortName: "gke"},
 			{Name: "Cloud SQL", ShortName: "sql"},
 			{Name: "IAM", ShortName: "iam"},
 			{Name: "Cloud Run", ShortName: "run"},

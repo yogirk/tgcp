@@ -1,8 +1,9 @@
-package template_service
+package gke
 
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -13,18 +14,11 @@ import (
 	"github.com/rk/tgcp/internal/styles"
 )
 
-const CacheTTL = 30 * time.Second
+const CacheTTL = 60 * time.Second
 
 // -----------------------------------------------------------------------------
-// Models
+// Models & Msgs
 // -----------------------------------------------------------------------------
-
-// ExampleItem represents a resource managed by this service
-type ExampleItem struct {
-	Name   string
-	Status string
-	ID     string
-}
 
 // Tick message for background refresh
 type tickMsg time.Time
@@ -39,7 +33,7 @@ const (
 )
 
 // Msg types
-type dataMsg []ExampleItem
+type clustersMsg []Cluster
 type errMsg error
 type actionResultMsg struct{ err error }
 
@@ -47,9 +41,8 @@ type actionResultMsg struct{ err error }
 // Service Definition
 // -----------------------------------------------------------------------------
 
-// Service implements the services.Service interface
 type Service struct {
-	client    *Client // Your API Client
+	client    *Client
 	projectID string
 	table     table.Model
 
@@ -58,29 +51,31 @@ type Service struct {
 	filtering   bool
 
 	// State
-	items     []ExampleItem
-	loading   bool
-	err       error
+	clusters []Cluster
+	loading  bool
+	err      error
 
 	// View State
-	viewState    ViewState
-	selectedItem *ExampleItem
+	viewState       ViewState
+	selectedCluster *Cluster
 
 	// Confirmation State
-	pendingAction string    // e.g. "start", "stop"
+	pendingAction string    // e.g. "connect"
 	actionSource  ViewState // Where to return after confirmation
 
 	// Cache
 	cache *core.Cache
 }
 
-// NewService creates a new instance of the service
 func NewService(cache *core.Cache) *Service {
 	// 1. Table Setup
 	columns := []table.Column{
-		{Title: "Name", Width: 30},
-		{Title: "Status", Width: 15},
-		{Title: "ID", Width: 20},
+		{Title: "Name", Width: 25},
+		{Title: "Location", Width: 15},
+		{Title: "Status", Width: 12},
+		{Title: "Version", Width: 18},
+		{Title: "Mode", Width: 10},
+		{Title: "Nodes", Width: 8},
 	}
 
 	t := table.New(
@@ -89,7 +84,6 @@ func NewService(cache *core.Cache) *Service {
 		table.WithHeight(10),
 	)
 
-	// Apply standard styles
 	s := table.DefaultStyles()
 	s.Header = styles.HeaderStyle
 	s.Selected = lipgloss.NewStyle().
@@ -100,7 +94,7 @@ func NewService(cache *core.Cache) *Service {
 
 	// 2. Filter Input Setup
 	ti := textinput.New()
-	ti.Placeholder = "Filter items..."
+	ti.Placeholder = "Filter clusters..."
 	ti.Prompt = "/ "
 	ti.CharLimit = 100
 	ti.Width = 50
@@ -113,23 +107,20 @@ func NewService(cache *core.Cache) *Service {
 	}
 }
 
-// Name returns the full human-readable name
 func (s *Service) Name() string {
-	return "Template Service"
+	return "Kubernetes Engine"
 }
 
-// ShortName returns the specialized identifier (e.g. "gce", "sql")
 func (s *Service) ShortName() string {
-	return "template"
+	return "gke"
 }
 
-// HelpText returns context-aware keybindings
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "r:Refresh  /:Filter  Ent:Detail"
+		return "r:Refresh  /:Filter  K:k9s  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
-		return "Esc/q:Back"
+		return "Esc/q:Back  K:k9s"
 	}
 	if s.viewState == ViewConfirmation {
 		return "y:Confirm  n:Cancel"
@@ -138,53 +129,47 @@ func (s *Service) HelpText() string {
 }
 
 // -----------------------------------------------------------------------------
-// Lifecycle & Interface Implementation
+// Lifecycle
 // -----------------------------------------------------------------------------
 
-// InitService initializes the API client
 func (s *Service) InitService(ctx context.Context, projectID string) error {
 	s.projectID = projectID
-	// Initialize your client here
-	// client, err := NewClient(ctx)
-	// if err != nil { return err }
-	// s.client = client
+	client, err := NewClient(ctx)
+	if err != nil {
+		return err
+	}
+	s.client = client
 	return nil
 }
 
-// Init startup commands (e.g. background tick)
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
 }
 
-// tick creates a background ticker for cache invalidation
 func (s *Service) tick() tea.Cmd {
 	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-// Refresh triggers a forced data reload
 func (s *Service) Refresh() tea.Cmd {
 	s.loading = true
-	return s.fetchDataCmd(true)
+	return s.fetchClustersCmd(true) // force refresh
 }
 
-// Reset clears the service state when navigating away or switching projects
 func (s *Service) Reset() {
 	s.viewState = ViewList
-	s.selectedItem = nil
-	s.err = nil          // CRITICAL: Always clear errors on reset
-	s.table.SetCursor(0) // Reset table position
+	s.selectedCluster = nil
+	s.err = nil
+	s.table.SetCursor(0)
 	s.filtering = false
 	s.filterInput.Reset()
 }
 
-// IsRootView returns true if we are at the top-level list
 func (s *Service) IsRootView() bool {
 	return s.viewState == ViewList
 }
 
-// Focus handles input focus (Visual Highlight)
 func (s *Service) Focus() {
 	s.table.Focus()
 	st := table.DefaultStyles()
@@ -196,14 +181,13 @@ func (s *Service) Focus() {
 	s.table.SetStyles(st)
 }
 
-// Blur handles loss of input focus (Visual Dimming)
 func (s *Service) Blur() {
 	s.table.Blur()
 	st := table.DefaultStyles()
 	st.Header = styles.HeaderStyle
 	st.Selected = lipgloss.NewStyle().
 		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")). // Dark grey
+		Background(lipgloss.Color("237")).
 		Bold(false)
 	s.table.SetStyles(st)
 }
@@ -216,18 +200,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	// 1. Background Tick
 	case tickMsg:
-		return s, tea.Batch(s.fetchDataCmd(false), s.tick())
+		return s, tea.Batch(s.fetchClustersCmd(false), s.tick())
 
-	// 2. Data Loaded
-	case dataMsg:
+	case clustersMsg:
 		s.loading = false
-		s.items = msg
-		s.updateTable(s.items)
+		s.clusters = msg
+		s.updateTable(s.clusters)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
-	// 3. Error Handling
 	case errMsg:
 		s.loading = false
 		s.err = msg
@@ -236,19 +217,17 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			s.err = msg.err
 		}
-		// Refresh after action
-		return s, s.Refresh()
+		// Don't auto verify/refresh for external commands usually, but ok.
+		return s, nil
 
-	// 4. Window Resize
 	case tea.WindowSizeMsg:
-		const heightOffset = 6 // app header + status bar + padding
+		const heightOffset = 6
 		newHeight := msg.Height - heightOffset
 		if newHeight < 5 {
 			newHeight = 5
 		}
 		s.table.SetHeight(newHeight)
 
-	// 5. User Input
 	case tea.KeyMsg:
 		// FILTERING MODE
 		if s.filtering {
@@ -257,7 +236,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.filtering = false
 				s.filterInput.Blur()
 				s.filterInput.Reset()
-				s.updateTable(s.items) // Reset table
+				s.updateTable(s.clusters)
 				return s, nil
 			case "enter":
 				s.filtering = false
@@ -266,15 +245,11 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			var inputCmd tea.Cmd
 			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			
-			// Implement filtering logic here
-			// query := s.filterInput.Value()
-			// s.filterItems(query)
-			
+			// TODO: Implement actual string matching filter if needed
 			return s, inputCmd
 		}
 
-		// LIST VIEW KEYBINDINGS
+		// LIST VIEW
 		if s.viewState == ViewList {
 			switch msg.String() {
 			case "/":
@@ -284,36 +259,43 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "r":
 				return s, s.Refresh()
 			case "enter":
-				// Handle selection
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.items) {
-					s.selectedItem = &s.items[idx]
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.clusters) {
+					s.selectedCluster = &s.clusters[idx]
 					s.viewState = ViewDetail
+				}
+			case "K": // Launch k9s
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.clusters) {
+					c := s.clusters[idx]
+					return s, s.launchK9s(c)
 				}
 			}
 			s.table, cmd = s.table.Update(msg)
 			return s, cmd
 		}
 
-		// DETAIL VIEW KEYBINDINGS
+		// DETAIL VIEW
 		if s.viewState == ViewDetail {
 			switch msg.String() {
 			case "esc", "q":
 				s.viewState = ViewList
-				s.selectedItem = nil
+				s.selectedCluster = nil
 				return s, nil
-			// Add action keys here
+			case "K": // Launch k9s
+				if s.selectedCluster != nil {
+					return s, s.launchK9s(*s.selectedCluster)
+				}
 			}
 		}
 
-		// CONFIRMATION VIEW KEYBINDINGS
+		// CONFIRMATION VIEW
+		// (Not currently used but ready)
 		if s.viewState == ViewConfirmation {
 			switch msg.String() {
 			case "y", "enter":
-				// Perform Action
-				// cmd = s.performActionCmd()
+				// s.pendingAction logic
 				s.viewState = s.actionSource
 				s.pendingAction = ""
-				return s, cmd
+				return s, nil
 			case "n", "esc", "q":
 				s.viewState = s.actionSource
 				s.pendingAction = ""
@@ -330,21 +312,17 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading && len(s.items) == 0 {
-		return "Loading..."
+	if s.loading && len(s.clusters) == 0 {
+		return "Loading Kubernetes clusters..."
 	}
 	if s.err != nil {
 		return fmt.Sprintf("Error: %v", s.err)
 	}
 
 	if s.viewState == ViewDetail {
-		return "Detail View Placeholder" // Implement detailed view here
-	}
-	if s.viewState == ViewConfirmation {
-		return fmt.Sprintf("Are you sure you want to %s? (y/n)", s.pendingAction)
+		return s.renderDetailView()
 	}
 
-	// Default: List View
 	return s.renderListView()
 }
 
@@ -356,38 +334,66 @@ func (s *Service) renderListView() string {
 // Helper Commands
 // -----------------------------------------------------------------------------
 
-func (s *Service) fetchDataCmd(force bool) tea.Cmd {
+func (s *Service) fetchClustersCmd(force bool) tea.Cmd {
 	return func() tea.Msg {
-		key := "template_data"
+		key := fmt.Sprintf("gke_clusters:%s", s.projectID)
 
-		// 1. Check Cache
 		if !force && s.cache != nil {
 			if val, found := s.cache.Get(key); found {
-				if items, ok := val.([]ExampleItem); ok {
-					return dataMsg(items)
+				if items, ok := val.([]Cluster); ok {
+					return clustersMsg(items)
 				}
 			}
 		}
 
-		// 2. API Call (Simulated)
-		// if s.client == nil { return errMsg(fmt.Errorf("client not init")) }
-		// data, err := s.client.ListItems()
-		// if err != nil { return errMsg(err) }
-		data := []ExampleItem{} // Placeholder
-
-		// 3. Update Cache
-		if s.cache != nil {
-			s.cache.Set(key, data, CacheTTL)
+		if s.client == nil {
+			return errMsg(fmt.Errorf("client not initialized"))
 		}
 
-		return dataMsg(data)
+		clusters, err := s.client.ListClusters(s.projectID)
+		if err != nil {
+			return errMsg(err)
+		}
+
+		if s.cache != nil {
+			s.cache.Set(key, clusters, CacheTTL)
+		}
+
+		return clustersMsg(clusters)
 	}
 }
 
-func (s *Service) updateTable(items []ExampleItem) {
+func (s *Service) updateTable(items []Cluster) {
 	rows := make([]table.Row, len(items))
 	for i, item := range items {
-		rows[i] = table.Row{item.Name, item.Status, item.ID}
+		status := item.Status
+		if item.Status == "RUNNING" {
+			status = "RUNNING" // could add color here but table handles it poorly
+		}
+
+		rows[i] = table.Row{
+			item.Name,
+			item.Location,
+			status,
+			item.MasterVersion,
+			item.Mode,
+			fmt.Sprintf("%d", item.NodeCount),
+		}
 	}
 	s.table.SetRows(rows)
+}
+
+func (s *Service) launchK9s(c Cluster) tea.Cmd {
+	return tea.ExecProcess(exec.Command("k9s", "--context", fmt.Sprintf("gke_%s_%s_%s", s.projectID, c.Location, c.Name)), func(err error) tea.Msg {
+		if err != nil {
+			// Fallback: Try to get credentials first?
+			// The user might not have context set up.
+			// Best effort: Run gcloud get-credentials then k9s
+			cmdStr := fmt.Sprintf("gcloud container clusters get-credentials %s --zone %s --project %s && k9s", c.Name, c.Location, s.projectID)
+			return tea.ExecProcess(exec.Command("bash", "-c", cmdStr), func(err error) tea.Msg {
+				return actionResultMsg{err}
+			})
+		}
+		return actionResultMsg{nil}
+	})
 }

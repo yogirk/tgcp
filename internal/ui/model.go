@@ -13,6 +13,7 @@ import (
 	"github.com/rk/tgcp/internal/services/cloudsql"
 	"github.com/rk/tgcp/internal/services/gce"
 	"github.com/rk/tgcp/internal/services/gcs"
+	"github.com/rk/tgcp/internal/services/gke"
 	"github.com/rk/tgcp/internal/services/iam"
 	"github.com/rk/tgcp/internal/services/net"
 	"github.com/rk/tgcp/internal/services/overview"
@@ -87,6 +88,13 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		gceSvc.InitService(context.Background(), authState.ProjectID)
 	}
 	svcMap["gce"] = gceSvc
+
+	// Create GKE Service
+	gkeSvc := gke.NewService(cache)
+	if authState.ProjectID != "" {
+		gkeSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["gke"] = gkeSvc
 
 	// Create Cloud SQL Service
 	sqlSvc := cloudsql.NewService(cache)

@@ -1,0 +1,92 @@
+package gke
+
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/rk/tgcp/internal/styles"
+)
+
+func (s *Service) renderDetailView() string {
+	if s.selectedCluster == nil {
+		return "No cluster selected"
+	}
+	c := s.selectedCluster
+
+	// 1. Header Box
+	headerTitle := fmt.Sprintf("📦 Cluster: %s (%s)", c.Name, c.Status)
+	headerContent := fmt.Sprintf(
+		"Current Master: %s\nEndpoint: %s\nMode: %s\nNetwork: %s / %s",
+		c.MasterVersion,
+		c.Endpoint,
+		c.Mode,
+		c.Network,
+		c.Subnetwork,
+	)
+
+	headerBox := styles.BoxStyle.Copy().
+		BorderForeground(styles.ColorAccent).
+		Width(80).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				styles.HeaderStyle.Render(headerTitle),
+				headerContent,
+			),
+		)
+
+	// 2. Node Pools Box
+	var poolLines []string
+	for _, p := range c.NodePools {
+		statusIcon := "🟢"
+		if p.Status != "RUNNING" && p.Status != "RUNNABLE" {
+			statusIcon = "🟡"
+		}
+
+		spotLabel := ""
+		if p.IsSpot {
+			spotLabel = "⚠️ SPOT"
+		}
+
+		poolParams := fmt.Sprintf(
+			"  Type: %s | Disk: %dGB | Count: %d (Init: %d)",
+			p.MachineType, p.DiskSizeGb, p.InitialNodeCount, p.InitialNodeCount,
+		)
+
+		autoScaling := ""
+		if p.Autoscaling.Enabled {
+			autoScaling = fmt.Sprintf("  Autoscaling: %d - %d nodes", p.Autoscaling.MinNodeCount, p.Autoscaling.MaxNodeCount)
+		}
+
+		line := fmt.Sprintf("%s %s %s\n%s", statusIcon, p.Name, spotLabel, poolParams)
+		if autoScaling != "" {
+			line += "\n" + autoScaling
+		}
+		poolLines = append(poolLines, line, "") // Empty string for spacing
+	}
+
+	poolsContent := lipgloss.JoinVertical(lipgloss.Left, poolLines...)
+	poolsBox := styles.BoxStyle.Copy().
+		BorderForeground(styles.ColorSubtext).
+		Width(80).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				styles.HeaderStyle.Render("🖥️ Node Pools (Infrastructure Cost)"),
+				poolsContent,
+			),
+		)
+
+	// 3. Command Hint
+	cmdHint := styles.SubtextStyle.Render("Press 'K' to launch k9s for this cluster")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		headerBox,
+		"",
+		poolsBox,
+		"",
+		cmdHint,
+	)
+}
+
+func (s *Service) renderConfirmation() string {
+	return "Confirmation View"
+}

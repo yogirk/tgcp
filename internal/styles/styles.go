@@ -12,6 +12,7 @@ var (
 	ColorWarning   = lipgloss.Color("214") // Orange
 	ColorError     = lipgloss.Color("196") // Red
 	ColorHighlight = lipgloss.Color("212") // Light Pink
+	ColorAccent    = lipgloss.Color("39")  // Cyan/Blue for GKE headers
 
 	// Base Styles
 	BaseStyle = lipgloss.NewStyle().
