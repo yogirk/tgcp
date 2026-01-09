@@ -26,7 +26,8 @@ type SidebarModel struct {
 func NewSidebar() SidebarModel {
 	return SidebarModel{
 		Items: []ServiceItem{
-			{Name: "Compute Engine", ShortName: "gce", Active: true},
+			{Name: "Overview", ShortName: "overview", Active: true},
+			{Name: "Compute Engine", ShortName: "gce"},
 			{Name: "Cloud SQL", ShortName: "sql"},
 			{Name: "IAM", ShortName: "iam"},
 			{Name: "Cloud Run", ShortName: "run"},

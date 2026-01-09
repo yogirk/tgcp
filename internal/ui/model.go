@@ -15,6 +15,7 @@ import (
 	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/iam"
 	"github.com/rk/tgcp/internal/services/net"
+	"github.com/rk/tgcp/internal/services/overview"
 	"github.com/rk/tgcp/internal/ui/components"
 )
 
@@ -72,6 +73,13 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 
 	// Initialize Services
 	svcMap := make(map[string]services.Service)
+
+	// Create Overview Service
+	billingSvc := overview.NewService(cache)
+	if authState.ProjectID != "" {
+		billingSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["overview"] = billingSvc
 
 	// Create GCE Service
 	gceSvc := gce.NewService(cache)

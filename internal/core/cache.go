@@ -52,6 +52,13 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 	return item.Value, true
 }
 
+// Delete removes an item from the cache
+func (c *Cache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.items, key)
+}
+
 // Flush removes all items from the cache
 func (c *Cache) Flush() {
 	c.mu.Lock()

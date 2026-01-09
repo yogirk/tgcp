@@ -15,7 +15,8 @@ type HomeMenuModel struct {
 func NewHomeMenu() HomeMenuModel {
 	return HomeMenuModel{
 		Items: []ServiceItem{
-			{Name: "Google Compute Engine (GCE)", ShortName: "gce", Active: true},
+			{Name: "Overview", ShortName: "overview", Active: true},
+			{Name: "Google Compute Engine (GCE)", ShortName: "gce"},
 			{Name: "Cloud SQL", ShortName: "sql"},
 			{Name: "Identity & Access Management (IAM)", ShortName: "iam"},
 			{Name: "Cloud Run", ShortName: "run"},
