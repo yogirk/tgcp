@@ -17,6 +17,7 @@ func NewHomeMenu() HomeMenuModel {
 		Items: []ServiceItem{
 			{Name: "Overview", ShortName: "overview", Active: true},
 			{Name: "Google Compute Engine (GCE)", ShortName: "gce"},
+			{Name: "Disks (Block Storage)", ShortName: "disks"},
 			{Name: "Kubernetes Engine (GKE)", ShortName: "gke"},
 			{Name: "Cloud SQL", ShortName: "sql"},
 			{Name: "Identity & Access Management (IAM)", ShortName: "iam"},

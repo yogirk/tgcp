@@ -11,6 +11,7 @@ import (
 	"github.com/rk/tgcp/internal/services/bigquery"
 	"github.com/rk/tgcp/internal/services/cloudrun"
 	"github.com/rk/tgcp/internal/services/cloudsql"
+	"github.com/rk/tgcp/internal/services/disks"
 	"github.com/rk/tgcp/internal/services/gce"
 	"github.com/rk/tgcp/internal/services/gcs"
 	"github.com/rk/tgcp/internal/services/gke"
@@ -95,6 +96,13 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		gkeSvc.InitService(context.Background(), authState.ProjectID)
 	}
 	svcMap["gke"] = gkeSvc
+
+	// Create Disks Service
+	diskSvc := disks.NewService(cache)
+	if authState.ProjectID != "" {
+		diskSvc.InitService(context.Background(), authState.ProjectID)
+	}
+	svcMap["disks"] = diskSvc
 
 	// Create Cloud SQL Service
 	sqlSvc := cloudsql.NewService(cache)
