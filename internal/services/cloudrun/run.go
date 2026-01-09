@@ -322,7 +322,8 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
 						svc := svcs[idx]
 						filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, svc.Name)
-						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "run"} }
+						heading := fmt.Sprintf("Service: %s", svc.Name)
+						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "run", Heading: heading} }
 					}
 				}
 			}

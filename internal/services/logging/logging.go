@@ -39,39 +39,30 @@ type Service struct {
 
 	// Navigation
 	returnTo string
+	heading  string
 }
 
 func NewService(cache *core.Cache) *Service {
 	// Table Setup
-	columns := []table.Column{
-		{Title: "Time", Width: 25}, // 2006-01-02 15:04:05 fits in ~20 chars
-		{Title: "Severity", Width: 10},
-		{Title: "Resource", Width: 20},
-		{Title: "Name", Width: 20},
-    	{Title: "Location", Width: 15},
-		{Title: "Payload", Width: 60},
-	}
-
 	t := table.New(
-		table.WithColumns(columns),
 		table.WithFocused(true),
 		table.WithHeight(10),
 	)
 
 	// Custom Table Styles
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
+	st := table.DefaultStyles()
+	st.Header = styles.HeaderStyle
+	st.Selected = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	
 	// Add bottom border to all cells for "clear separated line"
-	s.Cell = s.Cell.Border(lipgloss.NormalBorder(), false, false, true, false).
+	st.Cell = st.Cell.Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(0, 1) // Add horizontal padding for "clear indentation"
 
-	t.SetStyles(s)
+	t.SetStyles(st)
 
 	// Filter Input Setup
 	ti := textinput.New()
@@ -81,11 +72,13 @@ func NewService(cache *core.Cache) *Service {
 	ti.Width = 60
 	ti.SetValue("") // Default to empty (triggers last 30m in api.go)
 
-	return &Service{
+	s := &Service{
 		table:       t,
 		filterInput: ti,
 		cache:       cache,
 	}
+	s.setColumns(false) // Default columns
+	return s
 }
 
 func (s *Service) Name() string {
@@ -109,6 +102,8 @@ func (s *Service) HelpText() string {
 	}
 	return base
 }
+
+
 
 // Focus handles input focus
 func (s *Service) Focus() {
@@ -260,6 +255,34 @@ func (s *Service) SetReturnTo(service string) {
 	s.returnTo = service
 }
 
+// SetHeading sets the custom heading and adjusts columns
+func (s *Service) SetHeading(heading string) {
+	s.heading = heading
+	s.setColumns(heading != "")
+}
+
+func (s *Service) setColumns(minimal bool) {
+	var cols []table.Column
+	if minimal {
+		cols = []table.Column{
+			{Title: "Time", Width: 25},
+			{Title: "Severity", Width: 10},
+			{Title: "Location", Width: 15},
+			{Title: "Payload", Width: 80}, // Expanded payload
+		}
+	} else {
+		cols = []table.Column{
+			{Title: "Time", Width: 25},
+			{Title: "Severity", Width: 10},
+			{Title: "Resource", Width: 20},
+			{Title: "Name", Width: 20},
+			{Title: "Location", Width: 15},
+			{Title: "Payload", Width: 60},
+		}
+	}
+	s.table.SetColumns(cols)
+}
+
 
 func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 	return func() tea.Msg {
@@ -286,6 +309,7 @@ func (s *Service) Refresh() tea.Cmd {
 func (s *Service) Reset() {
 	s.err = nil
 	s.table.SetCursor(0)
+	s.SetHeading("") // Reset heading and columns
 }
 
 func (s *Service) IsRootView() bool {
@@ -295,14 +319,27 @@ func (s *Service) IsRootView() bool {
 func (s *Service) updateTable(entries []LogEntry) {
 	rows := make([]table.Row, len(entries))
 	for i, e := range entries {
-		rows[i] = table.Row{
-			// Improved timestamp format with date
-			e.Timestamp.Local().Format("2006-01-02 15:04:05"),
-			renderSeverity(e.Severity),
-			e.ResourceType,
-			e.ResourceName,
-			e.Location,
-			e.Payload,
+		ts := e.Timestamp.Local().Format("2006-01-02 15:04:05")
+		sev := renderSeverity(e.Severity)
+
+		if s.heading != "" {
+			// Minimal columns
+			rows[i] = table.Row{
+				ts,
+				sev,
+				e.Location,
+				e.Payload,
+			}
+		} else {
+			// Full columns
+			rows[i] = table.Row{
+				ts,
+				sev,
+				e.ResourceType,
+				e.ResourceName,
+				e.Location,
+				e.Payload,
+			}
 		}
 	}
 	s.table.SetRows(rows)

@@ -229,7 +229,8 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					inst := s.instances[idx]
 					// Cloud SQL filter uses database_id usually project:instance
 					filter := fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s:%s"`, s.projectID, inst.Name)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "sql"} }
+					heading := fmt.Sprintf("Database: %s", inst.Name)
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "sql", Heading: heading} }
 				}
 			}
 			s.table, cmd = s.table.Update(msg)

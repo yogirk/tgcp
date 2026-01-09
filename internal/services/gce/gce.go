@@ -234,8 +234,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				instances := s.getCurrentInstances()
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					inst := instances[idx]
+					// Cloud SQL filter uses database_id usually project:instance
 					filter := fmt.Sprintf(`resource.type="gce_instance" AND resource.labels.instance_id="%s"`, inst.ID)
-					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gce"} }
+					heading := fmt.Sprintf("VM Instance: %s", inst.Name)
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gce", Heading: heading} }
 				}
 			}
 			// Forward to table

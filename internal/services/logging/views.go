@@ -24,6 +24,17 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	doc := strings.Builder{}
 
+	// Heading
+	if s.heading != "" {
+		header := styles.TitleStyle.Copy().
+			Foreground(styles.ColorPrimary).
+			Bold(true).
+			MarginBottom(1).
+			Render(s.heading)
+		doc.WriteString(header)
+		doc.WriteString("\n")
+	}
+
 	// Filter Bar
 	// Always show filter bar for logging as it is crucial
 	doc.WriteString(s.filterInput.View())

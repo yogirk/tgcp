@@ -1,14 +1,30 @@
 package logging
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "strings"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
 
-    "google.golang.org/api/logging/v2"
-    "google.golang.org/api/option"
+	"google.golang.org/api/logging/v2"
+	"google.golang.org/api/option"
+)
+
+// Regex patterns for log cleaning
+var (
+	// Matches RFC3339-like timestamps at start of line
+	// e.g. 2026-01-08T13:51:34.702339+00:00
+	reTimestamp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?\s+`)
+
+	// Matches Syslog headers
+	// e.g. aryaka-kubeadm kubelet[1213]:
+	reSyslogHeader = regexp.MustCompile(`^(\S+\s+)?\S+\[\d+\]:\s+`)
+
+	// Matches standard Go/K8s log prefixes
+	// e.g. I0108 13:51:34.701761    1213 scope.go:117]
+	reK8sHeader = regexp.MustCompile(`^[IVWE]\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\S+:\d+\]\s+`)
 )
 
 // Client wraps the Cloud Logging API (v2 REST)
@@ -75,14 +91,37 @@ func (c *Client) ListEntries(
             ts, _ = time.Parse(time.RFC3339, entry.Timestamp)
         }
 
-        // Determine Payload
+        // Determine Payload and Severity
         payload := ""
+        severity := strings.ToUpper(entry.Severity)
+
         if entry.TextPayload != "" {
-            payload = entry.TextPayload
+            payload = cleanPayload(entry.TextPayload, ts)
         } else if len(entry.JsonPayload) > 0 {
-            // JsonPayload is raw JSON map
-            b, _ := json.Marshal(entry.JsonPayload)
-            payload = string(b)
+			var data map[string]interface{}
+			if err := json.Unmarshal(entry.JsonPayload, &data); err == nil {
+				// Extract Severity from JSON if missing
+				if severity == "" {
+					if v, ok := data["severity"].(string); ok {
+						severity = strings.ToUpper(v)
+					}
+				}
+
+				// extract useful message
+				if msg, ok := data["message"].(string); ok {
+					payload = cleanPayload(msg, ts)
+				} else if msg, ok := data["msg"].(string); ok {
+					payload = cleanPayload(msg, ts)
+				} else if msg, ok := data["log"].(string); ok {
+					payload = cleanPayload(msg, ts)
+				} else {
+					// Fallback to raw JSON string
+					payload = string(entry.JsonPayload)
+				}
+			} else {
+				// Fallback to string
+				payload = string(entry.JsonPayload)
+			}
         } else if len(entry.ProtoPayload) > 0 {
             b, _ := json.Marshal(entry.ProtoPayload)
             payload = string(b)
@@ -121,8 +160,9 @@ func (c *Client) ListEntries(
             }
         }
 
-        // Severity
-        severity := strings.ToUpper(entry.Severity)
+		if !isValidSeverity(severity) {
+			severity = "DEFAULT"
+		}
 
         entries = append(entries, LogEntry{
             Timestamp:    ts,
@@ -145,3 +185,40 @@ func (c *Client) ListEntries(
 }
 
 
+
+// cleanPayload removes redundant timestamps and prefixes using regex
+func cleanPayload(raw string, ts time.Time) string {
+	// 1. Remove Timestamp
+	// If the line starts with a timestamp string that looks like our log timestamp, strip it.
+	// We rely on Regex for general shape match.
+	if loc := reTimestamp.FindStringIndex(raw); loc != nil {
+		raw = raw[loc[1]:]
+	}
+
+	// 2. Remove Syslog Header
+	// e.g. "host app[123]: "
+	if loc := reSyslogHeader.FindStringIndex(raw); loc != nil {
+		raw = raw[loc[1]:]
+	}
+	
+	// 3. Remove K8s Header
+	// e.g. "I0108 ... ] "
+	if loc := reK8sHeader.FindStringIndex(raw); loc != nil {
+		raw = raw[loc[1]:]
+	}
+
+	// 4. Remove quote wrapper if present (common in "msg" fields)
+	if strings.HasPrefix(raw, "\"") && strings.HasSuffix(raw, "\"") {
+		raw = strings.Trim(raw, "\"")
+	}
+
+	return strings.TrimSpace(raw)
+}
+
+func isValidSeverity(s string) bool {
+	switch s {
+	case "DEFAULT", "DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL", "ALERT", "EMERGENCY":
+		return true
+	}
+	return false
+}
