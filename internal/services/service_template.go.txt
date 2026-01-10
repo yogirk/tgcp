@@ -3,6 +3,7 @@ package template_service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -215,30 +216,51 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 5. User Input
 	case tea.KeyMsg:
-		// Check filter state before calling HandleKeyMsg (since it modifies the state)
+		// OPTION 1: Modern Filter Pattern (Recommended)
+		// Use HandleFilterUpdate for cleaner, more maintainable filter handling
+		if s.viewState == ViewList {
+			result := components.HandleFilterUpdate(
+				&s.filter,
+				msg,
+				s.items,
+				func(items []ExampleItem, query string) []ExampleItem {
+					return s.getFilteredItems(items, query)
+				},
+				s.updateTable,
+			)
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
+			}
+		}
+
+		// OPTION 2: Manual Filter Handling (Alternative)
+		// Use this if you need more control over filter behavior
+		// Uncomment below and comment out Option 1 if needed:
+		/*
 		wasActive := s.filter.IsActive()
-		
-		// Handle filter mode entry/exit
 		shouldExit, shouldKeepValue, filterCmd := s.filter.HandleKeyMsg(msg)
 		
-		// If we got a command and filter wasn't active before, we're entering filter mode
 		if filterCmd != nil && !wasActive {
-			// Entering filter mode - return the command to focus
 			return s, filterCmd
 		}
 		
 		if shouldExit {
 			if !shouldKeepValue {
-				s.updateTable(s.items) // Reset table when clearing filter
+				s.updateTable(s.items)
 			}
 		} else if s.filter.IsActive() {
-			// Filter is active - HandleKeyMsg already updated the TextInput internally
-			// Now apply the filter to the table immediately
 			items := s.getCurrentItems()
 			s.updateTable(items)
-			// Return the command from HandleKeyMsg (inputCmd for blinking cursor)
 			return s, filterCmd
 		}
+		*/
 
 		// LIST VIEW KEYBINDINGS
 		if s.viewState == ViewList {
@@ -303,7 +325,7 @@ func (s *Service) View() string {
 	}
 
 	if s.viewState == ViewDetail {
-		return "Detail View Placeholder" // Implement detailed view here
+		return s.renderDetailView()
 	}
 	if s.viewState == ViewConfirmation {
 		// Use shared confirmation component
@@ -369,3 +391,147 @@ func (s *Service) getCurrentItems() []ExampleItem {
 		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
 	})
 }
+
+// getFilteredItems is used by HandleFilterUpdate - filters items based on query
+func (s *Service) getFilteredItems(items []ExampleItem, query string) []ExampleItem {
+	if query == "" {
+		return items
+	}
+	return components.FilterSlice(items, query, func(item ExampleItem, q string) bool {
+		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
+	})
+}
+
+// renderDetailView renders the detail view for a selected item
+// Example implementation:
+func (s *Service) renderDetailView() string {
+	if s.selectedItem == nil {
+		return "Error: No item selected"
+	}
+
+	// Use lipgloss for styling
+	title := styles.TitleStyle.Render(s.selectedItem.Name)
+	
+	// Build detail content
+	var content strings.Builder
+	content.WriteString(title + "\n\n")
+	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
+	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
+	
+	// Wrap in a styled box
+	return styles.BoxStyle.Copy().
+		Border(lipgloss.RoundedBorder()).
+		Padding(1, 2).
+		Width(60).
+		Render(content.String())
+}
+
+// performActionCmd is an example of how to implement action commands
+// Example: Start/Stop actions
+func (s *Service) performActionCmd(action string) tea.Cmd {
+	return func() tea.Msg {
+		if s.client == nil {
+			return errMsg(fmt.Errorf("client not initialized"))
+		}
+		
+		// Example: Perform API call
+		// err := s.client.PerformAction(s.selectedItem.ID, action)
+		// if err != nil {
+		//     return actionResultMsg{err: err}
+		// }
+		
+		// Return success (no error)
+		return actionResultMsg{err: nil}
+	}
+}
+
+// Example: Multiple tables pattern (like GCS service)
+// If your service needs multiple tables (e.g., buckets and objects):
+/*
+type Service struct {
+	// ... other fields ...
+	table      *components.StandardTable  // Main table
+	objectTable *components.StandardTable // Secondary table
+}
+
+func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		s.table.HandleWindowSizeDefault(msg)
+		s.objectTable.HandleWindowSizeDefault(msg) // Handle both tables
+	// ... rest of update logic
+	}
+}
+*/
+
+// getFilteredItems is used by HandleFilterUpdate - filters items based on query
+func (s *Service) getFilteredItems(items []ExampleItem, query string) []ExampleItem {
+	if query == "" {
+		return items
+	}
+	return components.FilterSlice(items, query, func(item ExampleItem, q string) bool {
+		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
+	})
+}
+
+// renderDetailView renders the detail view for a selected item
+// Example implementation:
+func (s *Service) renderDetailView() string {
+	if s.selectedItem == nil {
+		return "Error: No item selected"
+	}
+
+	// Use lipgloss for styling
+	title := styles.TitleStyle.Render(s.selectedItem.Name)
+	
+	// Build detail content
+	var content strings.Builder
+	content.WriteString(title + "\n\n")
+	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
+	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
+	
+	// Wrap in a styled box
+	return styles.BoxStyle.Copy().
+		Border(lipgloss.RoundedBorder()).
+		Padding(1, 2).
+		Width(60).
+		Render(content.String())
+}
+
+// performActionCmd is an example of how to implement action commands
+// Example: Start/Stop actions
+func (s *Service) performActionCmd(action string) tea.Cmd {
+	return func() tea.Msg {
+		if s.client == nil {
+			return errMsg(fmt.Errorf("client not initialized"))
+		}
+		
+		// Example: Perform API call
+		// err := s.client.PerformAction(s.selectedItem.ID, action)
+		// if err != nil {
+		//     return actionResultMsg{err: err}
+		// }
+		
+		// Return success (no error)
+		return actionResultMsg{err: nil}
+	}
+}
+
+// Example: Multiple tables pattern (like GCS service)
+// If your service needs multiple tables (e.g., buckets and objects):
+/*
+type Service struct {
+	// ... other fields ...
+	table      *components.StandardTable  // Main table
+	objectTable *components.StandardTable // Secondary table
+}
+
+func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		s.table.HandleWindowSizeDefault(msg)
+		s.objectTable.HandleWindowSizeDefault(msg) // Handle both tables
+	// ... rest of update logic
+	}
+}
+*/

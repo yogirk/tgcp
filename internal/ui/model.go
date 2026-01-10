@@ -85,7 +85,8 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 	registry := core.NewServiceRegistry(cache)
 	registerAllServices(registry)
 
-	// Initialize all services
+	// Create service map but don't initialize services yet (lazy initialization)
+	// Services will be initialized on first access
 	svcMap := registry.InitializeAll(context.Background(), authState.ProjectID)
 
 	// Initialize Components
@@ -110,6 +111,43 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 // Init initializes the bubbletea program
 func (m MainModel) Init() tea.Cmd {
 	return tea.EnableMouseCellMotion
+}
+
+// getOrInitializeService gets a service from the map, initializing it lazily if needed
+// This implements lazy initialization - services are only initialized when first accessed
+func (m *MainModel) getOrInitializeService(ctx context.Context, serviceName string) (services.Service, error) {
+	// First check if service exists in map
+	if svc, exists := m.ServiceMap[serviceName]; exists {
+		// Service exists, but may not be initialized yet
+		// Use registry to ensure it's initialized
+		if m.ServiceRegistry != nil {
+			initializedSvc, err := m.ServiceRegistry.GetOrInitializeService(ctx, serviceName)
+			if err != nil {
+				return svc, err // Return original service if init fails
+			}
+			if initializedSvc != nil {
+				// Update the map with the initialized service
+				m.ServiceMap[serviceName] = initializedSvc
+				return initializedSvc, nil
+			}
+		}
+		return svc, nil
+	}
+	
+	// Service doesn't exist in map - try to get it from registry (lazy creation)
+	if m.ServiceRegistry != nil {
+		svc, err := m.ServiceRegistry.GetOrInitializeService(ctx, serviceName)
+		if err != nil {
+			return nil, err
+		}
+		if svc != nil {
+			// Add to map
+			m.ServiceMap[serviceName] = svc
+			return svc, nil
+		}
+	}
+	
+	return nil, nil // Service not found
 }
 
 // Update handles messages and updates the model
@@ -225,8 +263,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.Sidebar.Cursor = i
 							}
 						}
-						// Initialize service if needed (similar to sidebar logic)
-						if svc, exists := m.ServiceMap[m.ActiveService]; exists {
+						// Get or initialize service lazily
+						svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
+						if err != nil {
+							cmds = append(cmds, func() tea.Msg {
+								return core.StatusMsg{Message: "Failed to initialize service: " + err.Error(), IsError: true}
+							})
+						} else if svc != nil {
 							svc.Reset()
 							svc.Blur()
 							m.CurrentSvc = svc
@@ -318,8 +361,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Focus = FocusSidebar
 					m.Sidebar.Active = true
 
-					// Update Current Service
-					if svc, exists := m.ServiceMap[m.ActiveService]; exists {
+					// Get or initialize service lazily
+					svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
+					if err != nil {
+						cmds = append(cmds, func() tea.Msg {
+							return core.StatusMsg{Message: "Failed to initialize service: " + err.Error(), IsError: true}
+						})
+					} else if svc != nil {
 						svc.Reset() // Reset state (fix Bug 2)
 						svc.Blur()  // Ensure dimmed state initially (Fix UX Focus)
 						m.CurrentSvc = svc
@@ -465,7 +513,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		selectedSvc := m.Sidebar.SelectedService()
 		if selectedSvc.ShortName != "" && m.ActiveService != selectedSvc.ShortName {
 			m.ActiveService = selectedSvc.ShortName
-			if svc, exists := m.ServiceMap[m.ActiveService]; exists {
+			// Get or initialize service lazily
+			svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
+			if err != nil {
+				cmds = append(cmds, func() tea.Msg {
+					return core.StatusMsg{Message: "Failed to initialize service: " + err.Error(), IsError: true}
+				})
+				m.CurrentSvc = nil
+			} else if svc != nil {
 				svc.Reset() // Reset state (fix Bug 2)
 
 				// Sync Window Size immediately so table renders correctly
@@ -508,9 +563,31 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.Focus == FocusPalette {
 		m.StatusBar.SetHelpText("Esc:Cancel  Enter:Run  ↑/↓:Select")
 	} else if m.ViewMode == ViewHome {
-		m.StatusBar.SetHelpText("q:Quit  ?:Help  Enter:Select")
+		// Add help hint if help is not currently shown
+		helpText := "q:Quit  Enter:Select"
+		if !m.ShowHelp {
+			helpText += "  ?:Help"
+		}
+		m.StatusBar.SetHelpText(helpText)
 	} else if m.CurrentSvc != nil {
-		m.StatusBar.SetHelpText(m.CurrentSvc.HelpText())
+		// Get service help text and append help hint if help is not currently shown
+		helpText := m.CurrentSvc.HelpText()
+		if !m.ShowHelp {
+			// Append help hint to service help text
+			if helpText != "" {
+				helpText += "  ?:Help"
+			} else {
+				helpText = "?:Help"
+			}
+		}
+		m.StatusBar.SetHelpText(helpText)
+	} else {
+		// Fallback: show help hint if available
+		if !m.ShowHelp {
+			m.StatusBar.SetHelpText("?:Help")
+		} else {
+			m.StatusBar.SetHelpText("")
+		}
 	}
 
 	return m, tea.Batch(cmds...)
