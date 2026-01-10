@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 30 * time.Second
@@ -55,12 +55,13 @@ type Service struct {
 	table     *components.StandardTable
 
 	// UI Components
-	filter components.FilterModel
+	filter        components.FilterModel
+	filterSession components.FilterSession[ExampleItem]
 
 	// State
-	items     []ExampleItem
-	loading   bool
-	err       error
+	items   []ExampleItem
+	loading bool
+	err     error
 
 	// View State
 	viewState    ViewState
@@ -85,12 +86,14 @@ func NewService(cache *core.Cache) *Service {
 
 	t := components.NewStandardTable(columns)
 
-	return &Service{
+	svc := &Service{
 		table:     t,
-		filter:     components.NewFilterWithPlaceholder("Filter items..."),
+		filter:    components.NewFilterWithPlaceholder("Filter items..."),
 		viewState: ViewList,
 		cache:     cache,
 	}
+	svc.filterSession = components.NewFilterSession(&svc.filter, svc.getFilteredItems, svc.updateTable)
+	return svc
 }
 
 // Name returns the full human-readable name
@@ -195,7 +198,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dataMsg:
 		s.loading = false
 		s.items = msg
-		s.updateTable(s.items)
+		s.filterSession.Apply(s.items)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	// 3. Error Handling
@@ -216,18 +219,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 5. User Input
 	case tea.KeyMsg:
-		// OPTION 1: Modern Filter Pattern (Recommended)
-		// Use HandleFilterUpdate for cleaner, more maintainable filter handling
+		// Filter Pattern (Recommended)
 		if s.viewState == ViewList {
-			result := components.HandleFilterUpdate(
-				&s.filter,
-				msg,
-				s.items,
-				func(items []ExampleItem, query string) []ExampleItem {
-					return s.getFilteredItems(items, query)
-				},
-				s.updateTable,
-			)
+			result := s.filterSession.HandleKey(msg)
 
 			if result.Handled {
 				if result.Cmd != nil {
@@ -239,28 +233,6 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Continue processing other keys
 			}
 		}
-
-		// OPTION 2: Manual Filter Handling (Alternative)
-		// Use this if you need more control over filter behavior
-		// Uncomment below and comment out Option 1 if needed:
-		/*
-		wasActive := s.filter.IsActive()
-		shouldExit, shouldKeepValue, filterCmd := s.filter.HandleKeyMsg(msg)
-		
-		if filterCmd != nil && !wasActive {
-			return s, filterCmd
-		}
-		
-		if shouldExit {
-			if !shouldKeepValue {
-				s.updateTable(s.items)
-			}
-		} else if s.filter.IsActive() {
-			items := s.getCurrentItems()
-			s.updateTable(items)
-			return s, filterCmd
-		}
-		*/
 
 		// LIST VIEW KEYBINDINGS
 		if s.viewState == ViewList {
@@ -288,7 +260,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.viewState = ViewList
 				s.selectedItem = nil
 				return s, nil
-			// Add action keys here
+				// Add action keys here
 			}
 		}
 
@@ -338,7 +310,7 @@ func (s *Service) View() string {
 }
 
 func (s *Service) renderListView() string {
-	return s.table.View()
+	return lipgloss.JoinVertical(lipgloss.Left, s.filter.View(), s.table.View())
 }
 
 // -----------------------------------------------------------------------------
@@ -411,13 +383,13 @@ func (s *Service) renderDetailView() string {
 
 	// Use lipgloss for styling
 	title := styles.TitleStyle.Render(s.selectedItem.Name)
-	
+
 	// Build detail content
 	var content strings.Builder
 	content.WriteString(title + "\n\n")
 	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
 	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
-	
+
 	// Wrap in a styled box
 	return styles.BoxStyle.Copy().
 		Border(lipgloss.RoundedBorder()).
@@ -433,91 +405,18 @@ func (s *Service) performActionCmd(action string) tea.Cmd {
 		if s.client == nil {
 			return errMsg(fmt.Errorf("client not initialized"))
 		}
-		
+
 		// Example: Perform API call
 		// err := s.client.PerformAction(s.selectedItem.ID, action)
 		// if err != nil {
 		//     return actionResultMsg{err: err}
 		// }
-		
+
 		// Return success (no error)
 		return actionResultMsg{err: nil}
 	}
 }
 
-// Example: Multiple tables pattern (like GCS service)
-// If your service needs multiple tables (e.g., buckets and objects):
-/*
-type Service struct {
-	// ... other fields ...
-	table      *components.StandardTable  // Main table
-	objectTable *components.StandardTable // Secondary table
-}
-
-func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		s.table.HandleWindowSizeDefault(msg)
-		s.objectTable.HandleWindowSizeDefault(msg) // Handle both tables
-	// ... rest of update logic
-	}
-}
-*/
-
-// getFilteredItems is used by HandleFilterUpdate - filters items based on query
-func (s *Service) getFilteredItems(items []ExampleItem, query string) []ExampleItem {
-	if query == "" {
-		return items
-	}
-	return components.FilterSlice(items, query, func(item ExampleItem, q string) bool {
-		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
-	})
-}
-
-// renderDetailView renders the detail view for a selected item
-// Example implementation:
-func (s *Service) renderDetailView() string {
-	if s.selectedItem == nil {
-		return "Error: No item selected"
-	}
-
-	// Use lipgloss for styling
-	title := styles.TitleStyle.Render(s.selectedItem.Name)
-	
-	// Build detail content
-	var content strings.Builder
-	content.WriteString(title + "\n\n")
-	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
-	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
-	
-	// Wrap in a styled box
-	return styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
-		Width(60).
-		Render(content.String())
-}
-
-// performActionCmd is an example of how to implement action commands
-// Example: Start/Stop actions
-func (s *Service) performActionCmd(action string) tea.Cmd {
-	return func() tea.Msg {
-		if s.client == nil {
-			return errMsg(fmt.Errorf("client not initialized"))
-		}
-		
-		// Example: Perform API call
-		// err := s.client.PerformAction(s.selectedItem.ID, action)
-		// if err != nil {
-		//     return actionResultMsg{err: err}
-		// }
-		
-		// Return success (no error)
-		return actionResultMsg{err: nil}
-	}
-}
-
-// Example: Multiple tables pattern (like GCS service)
 // If your service needs multiple tables (e.g., buckets and objects):
 /*
 type Service struct {
