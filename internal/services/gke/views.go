@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 func (s *Service) renderDetailView() string {
@@ -88,5 +89,14 @@ func (s *Service) renderDetailView() string {
 }
 
 func (s *Service) renderConfirmation() string {
-	return "Confirmation View"
+	if s.selectedCluster == nil {
+		return "Error: No cluster selected"
+	}
+	
+	// GKE doesn't have start/stop actions, but confirmation is ready for future use
+	// For now, use a generic confirmation
+	if s.pendingAction == "" {
+		s.pendingAction = "perform action"
+	}
+	return components.RenderConfirmation(s.pendingAction, s.selectedCluster.Name, "cluster")
 }

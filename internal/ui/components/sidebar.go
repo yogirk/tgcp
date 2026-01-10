@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 type ServiceItem struct {

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 const CacheTTL = 30 * time.Second
@@ -55,15 +55,14 @@ type errMsg error
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model // Services Table
-	funcTable table.Model // Functions Table
+	table     *components.StandardTable // Services Table
+	funcTable *components.StandardTable // Functions Table
 
 	// Tab Component
 	activeTab Tab
 
 	// UI Components
-	filterInput textinput.Model
-	filtering   bool
+	filter components.FilterModel
 
 	// State
 	services  []RunService
@@ -89,20 +88,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "URL", Width: 50},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Apply styles
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
+	t := components.NewStandardTable(columns)
 
 	// 1b. Functions Table Setup
 	funcColumns := []table.Column{
@@ -111,27 +97,15 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "State", Width: 10},
 		{Title: "Updated", Width: 15},
 	}
-	ft := table.New(
-		table.WithColumns(funcColumns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-	ft.SetStyles(s)
-
-	// 2. Filter Input Setup
-	ti := textinput.New()
-	ti.Placeholder = "Filter services..."
-	ti.Prompt = "/ "
-	ti.CharLimit = 100
-	ti.Width = 50
+	ft := components.NewStandardTable(funcColumns)
 
 	return &Service{
-		table:       t,
-		funcTable:   ft,
-		activeTab:   TabServices,
-		filterInput: ti,
-		viewState:   ViewList,
-		cache:       cache,
+		table:     t,
+		funcTable: ft,
+		activeTab: TabServices,
+		filter:     components.NewFilterWithPlaceholder("Filter services..."),
+		viewState: ViewList,
+		cache:     cache,
 	}
 }
 
@@ -171,6 +145,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 // Init startup commands
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
@@ -201,6 +181,7 @@ func (s *Service) Reset() {
 	s.table.SetCursor(0) // Reset table position
 	s.funcTable.SetCursor(0)
 	s.activeTab = TabServices // Default to Services tab
+	s.filter.ExitFilterMode()
 }
 
 // IsRootView returns true if we are at the top-level list
@@ -211,27 +192,13 @@ func (s *Service) IsRootView() bool {
 // Focus handles input focus (Visual Highlight)
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
-	s.funcTable.SetStyles(st)
+	s.funcTable.Focus()
 }
 
 // Blur handles loss of input focus (Visual Dimming)
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")). // Dark grey
-		Bold(false)
-	s.table.SetStyles(st)
-	s.funcTable.SetStyles(st)
+	s.funcTable.Blur()
 }
 
 // -----------------------------------------------------------------------------
@@ -273,16 +240,47 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:
-		const heightOffset = 6 // app header + status bar + padding
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
-		s.funcTable.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
+		s.funcTable.HandleWindowSizeDefault(msg)
 
 	// 5. User Input
 	case tea.KeyMsg:
+		// Handle filter mode (only in list view)
+		if s.viewState == ViewList {
+			var result components.FilterUpdateResult
+			if s.activeTab == TabServices {
+				result = components.HandleFilterUpdate(
+					&s.filter,
+					msg,
+					s.services,
+					func(items []RunService, query string) []RunService {
+						return s.getFilteredServices(items, query)
+					},
+					s.updateTable,
+				)
+			} else {
+				result = components.HandleFilterUpdate(
+					&s.filter,
+					msg,
+					s.functions,
+					func(items []Function, query string) []Function {
+						return s.getFilteredFunctions(items, query)
+					},
+					s.updateFuncTable,
+				)
+			}
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
+			}
+		}
+
 		if s.viewState == ViewList {
 			switch msg.String() {
 			case "[", "]":
@@ -297,24 +295,22 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "r":
 				return s, s.Refresh()
+			case "/":
+				// Enter filter mode
+				cmd := s.filter.EnterFilterMode()
+				return s, cmd
 			case "enter":
 				// Handle detail view selection
 				if s.activeTab == TabServices {
 					if s.selectedService == nil {
-						// Check if table has selection
-						svcs := s.services // Currently no filtering support in get logic, but if filtering added, use filtered
+						svcs := s.getFilteredServices(s.services, s.filter.Value())
 						if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
 							s.selectedService = &svcs[idx]
 							s.viewState = ViewDetail
 						}
 					}
 				} else {
-					// Function Details
-					// Not fully implemented yet in prompt, but basic structure:
-					// Just toggling detail view state is same.
-					// Implementation plan said "Add function metadata viewer".
-					// Let's implement basic select.
-					funcs := s.functions
+					funcs := s.getFilteredFunctions(s.functions, s.filter.Value())
 					if idx := s.funcTable.Cursor(); idx >= 0 && idx < len(funcs) {
 						s.selectedFunc = &funcs[idx]
 						s.viewState = ViewDetail
@@ -322,10 +318,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+			var updatedTable *components.StandardTable
 			if s.activeTab == TabServices {
-				s.table, cmd = s.table.Update(msg)
+				updatedTable, cmd = s.table.Update(msg)
+				s.table = updatedTable
 			} else {
-				s.funcTable, cmd = s.funcTable.Update(msg)
+				updatedTable, cmd = s.funcTable.Update(msg)
+				s.funcTable = updatedTable
 			}
 			return s, cmd
 		} else if s.viewState == ViewDetail {
@@ -348,10 +347,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading {
-		return "Loading Cloud Run services..."
+		return components.RenderSpinner("Loading Cloud Run services...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error fetching Cloud Run services: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Services")
 	}
 
 	if s.viewState == ViewDetail {
@@ -365,19 +364,29 @@ func (s *Service) View() string {
 func (s *Service) renderWithTabs() string {
 	// Tabs
 	var tabs string
+	var tableView string
+	
+	// Filter Bar
+	var filterBar string
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		filterBar = s.filter.View() + "\n"
+	}
+	
 	if s.activeTab == TabServices {
 		tabs = lipgloss.JoinHorizontal(lipgloss.Top,
 			styles.ActiveTabStyle.Render(" Services "),
 			styles.InactiveTabStyle.Render(" Functions "),
 		)
-		return lipgloss.JoinVertical(lipgloss.Left, tabs, s.table.View())
+		tableView = s.table.View()
 	} else {
 		tabs = lipgloss.JoinHorizontal(lipgloss.Top,
 			styles.InactiveTabStyle.Render(" Services "),
 			styles.ActiveTabStyle.Render(" Functions "),
 		)
-		return lipgloss.JoinVertical(lipgloss.Left, tabs, s.funcTable.View())
+		tableView = s.funcTable.View()
 	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, tabs, filterBar, tableView)
 }
 
 func (s *Service) renderDetailView() string {
@@ -537,4 +546,24 @@ func (s *Service) updateFuncTable(items []Function) {
 		}
 	}
 	s.funcTable.SetRows(rows)
+}
+
+// getFilteredServices returns filtered services based on the query string
+func (s *Service) getFilteredServices(services []RunService, query string) []RunService {
+	if query == "" {
+		return services
+	}
+	return components.FilterSlice(services, query, func(svc RunService, q string) bool {
+		return components.ContainsMatch(svc.Name, string(svc.Status), svc.Region, svc.URL)(q)
+	})
+}
+
+// getFilteredFunctions returns filtered functions based on the query string
+func (s *Service) getFilteredFunctions(functions []Function, query string) []Function {
+	if query == "" {
+		return functions
+	}
+	return components.FilterSlice(functions, query, func(fn Function, q string) bool {
+		return components.ContainsMatch(fn.Name, fn.Region, fn.State, fn.URL)(q)
+	})
 }

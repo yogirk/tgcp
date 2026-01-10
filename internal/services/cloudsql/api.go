@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/core"
 	"google.golang.org/api/option"
 	sqladmin "google.golang.org/api/sqladmin/v1beta4"
 )

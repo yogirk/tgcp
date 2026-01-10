@@ -17,6 +17,10 @@ type Service interface {
 	// InitService initializes the service (API clients, empty state)
 	InitService(ctx context.Context, projectID string) error
 
+	// Reinit reinitializes the service with a new project ID
+	// This is called when switching projects and should reset state and reinitialize clients
+	Reinit(ctx context.Context, projectID string) error
+
 	// Update handles messages specific to this service
 	Update(msg tea.Msg) (tea.Model, tea.Cmd)
 

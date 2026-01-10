@@ -2,7 +2,7 @@ package ui
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 func renderAuthError(m MainModel) string {

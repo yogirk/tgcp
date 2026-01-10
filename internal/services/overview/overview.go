@@ -6,7 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/core"
 )
 
 const CacheTTL = 15 * time.Minute // Longer TTL for billing/inventory data
@@ -84,6 +84,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	}
 	s.client = client
 	return nil
+}
+
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
 }
 
 func (s *Service) Init() tea.Cmd {

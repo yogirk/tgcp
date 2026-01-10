@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 // Styles specific to billing dashboard
@@ -31,10 +32,10 @@ var (
 
 func (s *Service) View() string {
 	if s.data.InfoLoading && s.data.Info.BillingAccountID == "" {
-		return "Loading Overview..."
+		return components.RenderSpinner("Loading Overview...")
 	}
 	if s.data.Error != nil {
-		return fmt.Sprintf("Error loading overview: %v", s.data.Error)
+		return components.RenderError(s.data.Error, "Overview", "Project Overview")
 	}
 
 	// 1. Header Section (Status + Account)
@@ -70,7 +71,7 @@ func (s *Service) View() string {
 	// 2. Actionable Insights
 	var insightsContent string
 	if s.data.RecsLoading {
-		insightsContent = "⏳ Loading insights..."
+		insightsContent = components.RenderSpinner("Loading insights...")
 	} else if len(s.data.Recommendations) == 0 {
 		insightsContent = "✅ No active recommendations found (or Recommender API disabled)."
 	} else {
@@ -218,7 +219,7 @@ func (s *Service) View() string {
 	// 4. Budgets
 	var budgetContent string
 	if s.data.BudgetsLoading {
-		budgetContent = "⏳ Loading budgets..."
+		budgetContent = components.RenderSpinner("Loading budgets...")
 	} else if len(s.data.Budgets) == 0 {
 		budgetContent = "No budgets configured (or permission denied)."
 	} else {

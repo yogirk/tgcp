@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/core"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 )

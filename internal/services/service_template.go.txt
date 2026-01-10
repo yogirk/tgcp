@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 const CacheTTL = 30 * time.Second
@@ -51,11 +51,10 @@ type actionResultMsg struct{ err error }
 type Service struct {
 	client    *Client // Your API Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
 
 	// UI Components
-	filterInput textinput.Model
-	filtering   bool
+	filter components.FilterModel
 
 	// State
 	items     []ExampleItem
@@ -83,33 +82,13 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "ID", Width: 20},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Apply standard styles
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	// 2. Filter Input Setup
-	ti := textinput.New()
-	ti.Placeholder = "Filter items..."
-	ti.Prompt = "/ "
-	ti.CharLimit = 100
-	ti.Width = 50
+	t := components.NewStandardTable(columns)
 
 	return &Service{
-		table:       t,
-		filterInput: ti,
-		viewState:   ViewList,
-		cache:       cache,
+		table:     t,
+		filter:     components.NewFilterWithPlaceholder("Filter items..."),
+		viewState: ViewList,
+		cache:     cache,
 	}
 }
 
@@ -151,6 +130,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 // Init startup commands (e.g. background tick)
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
@@ -175,8 +160,7 @@ func (s *Service) Reset() {
 	s.selectedItem = nil
 	s.err = nil          // CRITICAL: Always clear errors on reset
 	s.table.SetCursor(0) // Reset table position
-	s.filtering = false
-	s.filterInput.Reset()
+	s.filter.ExitFilterMode()
 }
 
 // IsRootView returns true if we are at the top-level list
@@ -187,25 +171,11 @@ func (s *Service) IsRootView() bool {
 // Focus handles input focus (Visual Highlight)
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 // Blur handles loss of input focus (Visual Dimming)
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")). // Dark grey
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -241,56 +211,51 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:
-		const heightOffset = 6 // app header + status bar + padding
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	// 5. User Input
 	case tea.KeyMsg:
-		// FILTERING MODE
-		if s.filtering {
-			switch msg.String() {
-			case "esc":
-				s.filtering = false
-				s.filterInput.Blur()
-				s.filterInput.Reset()
-				s.updateTable(s.items) // Reset table
-				return s, nil
-			case "enter":
-				s.filtering = false
-				s.filterInput.Blur()
-				return s, nil
+		// Check filter state before calling HandleKeyMsg (since it modifies the state)
+		wasActive := s.filter.IsActive()
+		
+		// Handle filter mode entry/exit
+		shouldExit, shouldKeepValue, filterCmd := s.filter.HandleKeyMsg(msg)
+		
+		// If we got a command and filter wasn't active before, we're entering filter mode
+		if filterCmd != nil && !wasActive {
+			// Entering filter mode - return the command to focus
+			return s, filterCmd
+		}
+		
+		if shouldExit {
+			if !shouldKeepValue {
+				s.updateTable(s.items) // Reset table when clearing filter
 			}
-			var inputCmd tea.Cmd
-			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			
-			// Implement filtering logic here
-			// query := s.filterInput.Value()
-			// s.filterItems(query)
-			
-			return s, inputCmd
+		} else if s.filter.IsActive() {
+			// Filter is active - HandleKeyMsg already updated the TextInput internally
+			// Now apply the filter to the table immediately
+			items := s.getCurrentItems()
+			s.updateTable(items)
+			// Return the command from HandleKeyMsg (inputCmd for blinking cursor)
+			return s, filterCmd
 		}
 
 		// LIST VIEW KEYBINDINGS
 		if s.viewState == ViewList {
 			switch msg.String() {
-			case "/":
-				s.filtering = true
-				s.filterInput.Focus()
-				return s, textinput.Blink
 			case "r":
 				return s, s.Refresh()
 			case "enter":
 				// Handle selection
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.items) {
-					s.selectedItem = &s.items[idx]
+				items := s.getCurrentItems()
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(items) {
+					s.selectedItem = &items[idx]
 					s.viewState = ViewDetail
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 		}
 
@@ -331,17 +296,19 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading && len(s.items) == 0 {
-		return "Loading..."
+		return components.RenderSpinner("Loading...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Items")
 	}
 
 	if s.viewState == ViewDetail {
 		return "Detail View Placeholder" // Implement detailed view here
 	}
 	if s.viewState == ViewConfirmation {
-		return fmt.Sprintf("Are you sure you want to %s? (y/n)", s.pendingAction)
+		// Use shared confirmation component
+		// Example: components.RenderConfirmation(s.pendingAction, s.selectedItem.Name, "item")
+		return components.RenderConfirmation(s.pendingAction, s.selectedItem.Name, "item")
 	}
 
 	// Default: List View
@@ -390,4 +357,15 @@ func (s *Service) updateTable(items []ExampleItem) {
 		rows[i] = table.Row{item.Name, item.Status, item.ID}
 	}
 	s.table.SetRows(rows)
+}
+
+// getCurrentItems returns the currently visible items (filtered if filter is active)
+func (s *Service) getCurrentItems() []ExampleItem {
+	query := s.filter.Value()
+	if query == "" {
+		return s.items
+	}
+	return components.FilterSlice(s.items, query, func(item ExampleItem, q string) bool {
+		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
+	})
 }

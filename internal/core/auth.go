@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rk/tgcp/internal/utils"
+	"github.com/yogirk/tgcp/internal/utils"
 	"golang.org/x/oauth2/google"
 )
 

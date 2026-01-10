@@ -3,13 +3,13 @@ package cloudsql
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 60 * time.Second
@@ -30,7 +30,10 @@ const (
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
+
+	// UI Components
+	filter components.FilterModel
 
 	// State
 	instances []Instance
@@ -60,23 +63,11 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Tier", Width: 20},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-
-	t.SetStyles(s)
+	t := components.NewStandardTable(columns)
 
 	return &Service{
 		table:     t,
+		filter:     components.NewFilterWithPlaceholder("Filter instances..."),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -92,7 +83,7 @@ func (s *Service) ShortName() string {
 
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "r:Refresh  s:Start  x:Stop  Ent:Detail"
+		return "r:Refresh  /:Filter  s:Start  x:Stop  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
 		return "Esc/q:Back  s:Start  x:Stop"
@@ -105,24 +96,10 @@ func (s *Service) HelpText() string {
 
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")). // Dark grey
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 func (s *Service) InitService(ctx context.Context, projectID string) error {
@@ -133,6 +110,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	}
 	s.client = client
 	return nil
+}
+
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
 }
 
 func (s *Service) Init() tea.Cmd {
@@ -175,40 +158,63 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, s.Refresh()
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
+		// Handle filter mode (only in list view)
+		if s.viewState == ViewList {
+			result := components.HandleFilterUpdate(
+				&s.filter,
+				msg,
+				s.instances,
+				func(items []Instance, query string) []Instance {
+					return s.getFilteredInstances(items, query)
+				},
+				s.updateTable,
+			)
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
+			}
+		}
+
 		switch s.viewState {
 		case ViewList:
 			switch msg.String() {
 			case "r":
 				return s, s.fetchInstancesCmd(true)
 			case "enter":
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.instances) {
-					s.selectedInstance = &s.instances[idx]
+				instances := s.getFilteredInstances(s.instances, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
+					s.selectedInstance = &instances[idx]
 					s.viewState = ViewDetail
 				}
 			case "s": // Start
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.instances) {
-					s.selectedInstance = &s.instances[idx]
+				instances := s.getFilteredInstances(s.instances, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
+					s.selectedInstance = &instances[idx]
 					s.pendingAction = "start"
 					s.actionSource = ViewList
 					s.viewState = ViewConfirmation
 				}
 			case "x": // Stop
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.instances) {
-					s.selectedInstance = &s.instances[idx]
+				instances := s.getFilteredInstances(s.instances, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
+					s.selectedInstance = &instances[idx]
 					s.pendingAction = "stop"
 					s.actionSource = ViewList
 					s.viewState = ViewConfirmation
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 
 		case ViewDetail:
@@ -257,10 +263,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading {
-		return "Loading Cloud SQL instances..."
+		return components.RenderSpinner("Loading Cloud SQL instances...")
 	}
 	if s.err != nil {
-		return "Error: " + s.err.Error()
+		return components.RenderError(s.err, s.Name(), "Instances")
 	}
 
 	if s.viewState == ViewDetail {
@@ -270,7 +276,14 @@ func (s *Service) View() string {
 		return s.renderConfirmation()
 	}
 
-	return styles.BaseStyle.Render(s.table.View())
+	// Filter Bar
+	var content strings.Builder
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		content.WriteString(s.filter.View())
+		content.WriteString("\n")
+	}
+	content.WriteString(s.table.View())
+	return content.String()
 }
 
 // Cmd to fetch instances
@@ -315,6 +328,7 @@ func (s *Service) Reset() {
 	s.selectedInstance = nil
 	s.err = nil // Fix: Clear previous errors on reset
 	s.table.SetCursor(0)
+	s.filter.ExitFilterMode()
 }
 
 func (s *Service) IsRootView() bool {
@@ -349,6 +363,16 @@ func (s *Service) updateTable(instances []Instance) {
 		}
 	}
 	s.table.SetRows(rows)
+}
+
+// getFilteredInstances returns filtered instances based on the query string
+func (s *Service) getFilteredInstances(instances []Instance, query string) []Instance {
+	if query == "" {
+		return instances
+	}
+	return components.FilterSlice(instances, query, func(inst Instance, q string) bool {
+		return components.ContainsMatch(inst.Name, string(inst.State), inst.DatabaseVersion, inst.Region, inst.PrimaryIP, inst.Tier)(q)
+	})
 }
 
 func (s *Service) startInstanceCmd(i Instance) tea.Cmd {

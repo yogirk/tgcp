@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rk/tgcp/internal/utils"
+	"github.com/yogirk/tgcp/internal/utils"
 )
 
 // Action messages

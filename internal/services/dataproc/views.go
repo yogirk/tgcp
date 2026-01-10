@@ -2,24 +2,33 @@ package dataproc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 func (s *Service) View() string {
 	if s.loading && len(s.clusters) == 0 {
-		return "Loading Dataproc Clusters (us-central1)..."
+		return components.RenderSpinner("Loading Dataproc Clusters (us-central1)...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, "Dataproc", "Clusters")
 	}
 
 	if s.viewState == ViewDetail {
 		return s.renderDetailView()
 	}
 
-	return s.table.View()
+	// Filter Bar
+	var content strings.Builder
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		content.WriteString(s.filter.View())
+		content.WriteString("\n")
+	}
+	content.WriteString(s.table.View())
+	return content.String()
 }
 
 func (s *Service) renderDetailView() string {

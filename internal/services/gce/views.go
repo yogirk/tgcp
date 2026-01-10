@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 // renderDetailView renders the details of a single instance
@@ -108,43 +109,7 @@ func (s *Service) renderConfirmation() string {
 		return "Error: No instance selected"
 	}
 
-	actionTitle := "Confirm Action"
-	actionText := ""
-
-	if s.pendingAction == "start" {
-		actionText = fmt.Sprintf("Are you sure you want to START instance %s?", styles.TitleStyle.Render(s.selectedInstance.Name))
-	} else {
-		actionText = fmt.Sprintf("Are you sure you want to STOP instance %s?", styles.TitleStyle.Render(s.selectedInstance.Name))
-	}
-
-	prompt := styles.HelpStyle.Render("y (Confirm) / n (Cancel)")
-
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		styles.WarningStyle.Render(actionTitle),
-		"\n",
-		actionText,
-		"\n",
-		prompt,
-	)
-
-	dialog := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorWarning).
-		Padding(1, 4).
-		Render(content)
-
-	// Center the dialog in the view
-	// Since we don't have direct access to View's height/width here easily without passing it,
-	// we will just return the dialog and let the parent layout handle it, or use Place if we tracked size.
-	// But `Service` doesn't strictly track its own dimensions unless we stored them in WindowSizeMsg.
-	// For now, let's just return the dialog, it will be top-left aligned in the content area which is fine.
-	// Or we can simple padding to top/left to center it a bit.
-
-	return lipgloss.Place(
-		80, 20, // Approximate box
-		lipgloss.Center, lipgloss.Center,
-		dialog,
-	)
+	return components.RenderConfirmation(s.pendingAction, s.selectedInstance.Name, "instance")
 }
 
 // renderListView renders the main instance table
@@ -152,8 +117,8 @@ func (s *Service) renderListView() string {
 	doc := strings.Builder{}
 
 	// Filter Bar
-	if s.filtering || s.filterInput.Value() != "" {
-		doc.WriteString(s.filterInput.View())
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		doc.WriteString(s.filter.View())
 		doc.WriteString("\n")
 	}
 

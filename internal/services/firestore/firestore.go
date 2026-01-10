@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 120 * time.Second // Info changes rarely
@@ -39,10 +37,9 @@ type errMsg error
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
 
-	filterInput textinput.Model
-	filtering   bool
+	filter components.FilterModel
 
 	dbs     []Database
 	loading bool
@@ -62,31 +59,13 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Created", Width: 20},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	ti := textinput.New()
-	ti.Placeholder = "Filter databases..."
-	ti.Prompt = "/ "
-	ti.CharLimit = 100
-	ti.Width = 50
+	t := components.NewStandardTable(columns)
 
 	return &Service{
-		table:       t,
-		filterInput: ti,
-		viewState:   ViewList,
-		cache:       cache,
+		table:     t,
+		filter:     components.NewFilterWithPlaceholder("Filter databases..."),
+		viewState: ViewList,
+		cache:     cache,
 	}
 }
 
@@ -119,6 +98,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
 }
@@ -139,8 +124,7 @@ func (s *Service) Reset() {
 	s.selectedDB = nil
 	s.err = nil
 	s.table.SetCursor(0)
-	s.filtering = false
-	s.filterInput.Reset()
+	s.filter.ExitFilterMode()
 }
 
 func (s *Service) IsRootView() bool {
@@ -149,18 +133,10 @@ func (s *Service) IsRootView() bool {
 
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57"))
-	s.table.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(styles.ColorText).Background(lipgloss.Color("237"))
-	s.table.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -185,47 +161,46 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
-		if s.filtering {
-			switch msg.String() {
-			case "esc":
-				s.filtering = false
-				s.filterInput.Blur()
-				s.filterInput.Reset()
-				s.updateTable(s.dbs)
-				return s, nil
-			case "enter":
-				s.filtering = false
-				s.filterInput.Blur()
-				return s, nil
+		// Handle filter mode (only in list view)
+		if s.viewState == ViewList {
+			result := components.HandleFilterUpdate(
+				&s.filter,
+				msg,
+				s.dbs,
+				func(items []Database, query string) []Database {
+					return s.getFilteredDBs(items, query)
+				},
+				s.updateTable,
+			)
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
 			}
-			var inputCmd tea.Cmd
-			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			return s, inputCmd
 		}
 
 		if s.viewState == ViewList {
 			switch msg.String() {
-			case "/":
-				s.filtering = true
-				s.filterInput.Focus()
-				return s, textinput.Blink
 			case "r":
 				return s, s.Refresh()
 			case "enter":
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.dbs) {
-					s.selectedDB = &s.dbs[idx]
+				dbs := s.getFilteredDBs(s.dbs, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(dbs) {
+					s.selectedDB = &dbs[idx]
 					s.viewState = ViewDetail
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 		}
 
@@ -281,4 +256,14 @@ func (s *Service) updateTable(items []Database) {
 		}
 	}
 	s.table.SetRows(rows)
+}
+
+// getFilteredDBs returns filtered databases based on the query string
+func (s *Service) getFilteredDBs(dbs []Database, query string) []Database {
+	if query == "" {
+		return dbs
+	}
+	return components.FilterSlice(dbs, query, func(db Database, q string) bool {
+		return components.ContainsMatch(db.Name, db.Type, db.Location)(q)
+	})
 }

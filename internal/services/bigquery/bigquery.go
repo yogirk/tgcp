@@ -9,8 +9,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 const CacheTTL = 5 * time.Minute
@@ -43,9 +44,9 @@ type Service struct {
 	projectID string
 
 	// Tables
-	datasetTable table.Model
-	tableTable   table.Model
-	schemaTable  table.Model
+	datasetTable *components.StandardTable
+	tableTable   *components.StandardTable
+	schemaTable  *components.StandardTable
 
 	// UI
 	filterInput textinput.Model
@@ -70,7 +71,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "ID", Width: 30},
 		{Title: "Location", Width: 15},
 	}
-	dsTable := table.New(table.WithColumns(dsCols), table.WithFocused(true), table.WithHeight(10))
+	dsTable := components.NewStandardTable(dsCols)
 
 	// Table Table
 	tCols := []table.Column{
@@ -79,7 +80,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Rows", Width: 10},
 		{Title: "Size", Width: 10},
 	}
-	tTable := table.New(table.WithColumns(tCols), table.WithFocused(true), table.WithHeight(10))
+	tTable := components.NewStandardTable(tCols)
 
 	// Schema Table
 	sCols := []table.Column{
@@ -88,15 +89,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Mode", Width: 10},
 		{Title: "Description", Width: 30},
 	}
-	sTable := table.New(table.WithColumns(sCols), table.WithFocused(true), table.WithHeight(10))
-
-	// Apply Styles
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
-	dsTable.SetStyles(s)
-	tTable.SetStyles(s)
-	sTable.SetStyles(s)
+	sTable := components.NewStandardTable(sCols)
 
 	return &Service{
 		datasetTable: dsTable,
@@ -137,6 +130,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 func (s *Service) Init() tea.Cmd {
 	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
@@ -168,26 +167,12 @@ func (s *Service) Focus() {
 	s.datasetTable.Focus()
 	s.tableTable.Focus()
 	s.schemaTable.Focus()
-	// Highlight style update
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
-	s.datasetTable.SetStyles(st)
-	s.tableTable.SetStyles(st)
-	s.schemaTable.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.datasetTable.Blur()
 	s.tableTable.Blur()
 	s.schemaTable.Blur()
-	// Dim style update
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(styles.ColorText).Background(lipgloss.Color("237")).Bold(false)
-	s.datasetTable.SetStyles(st)
-	s.tableTable.SetStyles(st)
-	s.schemaTable.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -227,13 +212,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		h := msg.Height - 6
-		if h < 5 {
-			h = 5
-		}
-		s.datasetTable.SetHeight(h)
-		s.tableTable.SetHeight(h)
-		s.schemaTable.SetHeight(h)
+		s.datasetTable.HandleWindowSizeDefault(msg)
+		s.tableTable.HandleWindowSizeDefault(msg)
+		s.schemaTable.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -250,7 +231,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, s.fetchTablesCmd()
 				}
 			}
-			s.datasetTable, cmd = s.datasetTable.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.datasetTable.Update(msg)
+			s.datasetTable = updatedTable
 			return s, cmd
 		}
 
@@ -268,7 +251,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, s.fetchSchemaCmd()
 				}
 			}
-			s.tableTable, cmd = s.tableTable.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.tableTable.Update(msg)
+			s.tableTable = updatedTable
 			return s, cmd
 		}
 
@@ -278,7 +263,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.selectedTable = nil
 				return s, nil
 			}
-			s.schemaTable, cmd = s.schemaTable.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.schemaTable.Update(msg)
+			s.schemaTable = updatedTable
 			return s, cmd
 		}
 	}
@@ -291,10 +278,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading {
-		return "Loading BigQuery..."
+		return components.RenderSpinner("Loading BigQuery...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Datasets")
 	}
 
 	if s.viewState == ViewDatasets {

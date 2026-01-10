@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 60 * time.Second
@@ -44,11 +43,10 @@ type actionResultMsg struct{ err error }
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
 
 	// UI Components
-	filterInput textinput.Model
-	filtering   bool
+	filter components.FilterModel
 
 	// State
 	clusters []Cluster
@@ -78,32 +76,13 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Nodes", Width: 8},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	// 2. Filter Input Setup
-	ti := textinput.New()
-	ti.Placeholder = "Filter clusters..."
-	ti.Prompt = "/ "
-	ti.CharLimit = 100
-	ti.Width = 50
+	t := components.NewStandardTable(columns)
 
 	return &Service{
-		table:       t,
-		filterInput: ti,
-		viewState:   ViewList,
-		cache:       cache,
+		table:     t,
+		filter:     components.NewFilterWithPlaceholder("Filter clusters..."),
+		viewState: ViewList,
+		cache:     cache,
 	}
 }
 
@@ -142,6 +121,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
 }
@@ -162,8 +147,7 @@ func (s *Service) Reset() {
 	s.selectedCluster = nil
 	s.err = nil
 	s.table.SetCursor(0)
-	s.filtering = false
-	s.filterInput.Reset()
+	s.filter.ExitFilterMode()
 }
 
 func (s *Service) IsRootView() bool {
@@ -172,24 +156,10 @@ func (s *Service) IsRootView() bool {
 
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -221,55 +191,53 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, nil
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
-		// FILTERING MODE
-		if s.filtering {
-			switch msg.String() {
-			case "esc":
-				s.filtering = false
-				s.filterInput.Blur()
-				s.filterInput.Reset()
-				s.updateTable(s.clusters)
-				return s, nil
-			case "enter":
-				s.filtering = false
-				s.filterInput.Blur()
-				return s, nil
+		// Handle filter mode (only in list view)
+		if s.viewState == ViewList {
+			result := components.HandleFilterUpdate(
+				&s.filter,
+				msg,
+				s.clusters,
+				func(items []Cluster, query string) []Cluster {
+					return s.getFilteredClusters(items, query)
+				},
+				s.updateTable,
+			)
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
 			}
-			var inputCmd tea.Cmd
-			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			// TODO: Implement actual string matching filter if needed
-			return s, inputCmd
 		}
 
 		// LIST VIEW
 		if s.viewState == ViewList {
 			switch msg.String() {
-			case "/":
-				s.filtering = true
-				s.filterInput.Focus()
-				return s, textinput.Blink
 			case "r":
 				return s, s.Refresh()
 			case "enter":
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.clusters) {
-					s.selectedCluster = &s.clusters[idx]
+				clusters := s.getFilteredClusters(s.clusters, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(clusters) {
+					s.selectedCluster = &clusters[idx]
 					s.viewState = ViewDetail
 				}
 			case "K": // Launch k9s
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(s.clusters) {
-					c := s.clusters[idx]
+				clusters := s.getFilteredClusters(s.clusters, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(clusters) {
+					c := clusters[idx]
 					return s, s.launchK9s(c)
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 		}
 
@@ -313,10 +281,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading && len(s.clusters) == 0 {
-		return "Loading Kubernetes clusters..."
+		return components.RenderSpinner("Loading Kubernetes clusters...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Clusters")
 	}
 
 	if s.viewState == ViewDetail {
@@ -327,7 +295,14 @@ func (s *Service) View() string {
 }
 
 func (s *Service) renderListView() string {
-	return s.table.View()
+	// Filter Bar
+	var content strings.Builder
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		content.WriteString(s.filter.View())
+		content.WriteString("\n")
+	}
+	content.WriteString(s.table.View())
+	return content.String()
 }
 
 // -----------------------------------------------------------------------------
@@ -381,6 +356,16 @@ func (s *Service) updateTable(items []Cluster) {
 		}
 	}
 	s.table.SetRows(rows)
+}
+
+// getFilteredClusters returns filtered clusters based on the query string
+func (s *Service) getFilteredClusters(clusters []Cluster, query string) []Cluster {
+	if query == "" {
+		return clusters
+	}
+	return components.FilterSlice(clusters, query, func(cluster Cluster, q string) bool {
+		return components.ContainsMatch(cluster.Name, cluster.Location, cluster.Status, cluster.MasterVersion)(q)
+	})
 }
 
 func (s *Service) launchK9s(c Cluster) tea.Cmd {

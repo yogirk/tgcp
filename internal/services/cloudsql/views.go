@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 func (s *Service) renderDetailView() string {
@@ -65,38 +66,10 @@ Connection Name:   %s
 
 func (s *Service) renderConfirmation() string {
 	if s.selectedInstance == nil {
-		return "Error"
+		return "Error: No instance selected"
 	}
 
-	actionTitle := "Confirm Action"
-	actionText := ""
-	if s.pendingAction == "start" {
-		actionText = fmt.Sprintf("Are you sure you want to START instance %s?", styles.TitleStyle.Render(s.selectedInstance.Name))
-	} else {
-		actionText = fmt.Sprintf("Are you sure you want to STOP instance %s?", styles.TitleStyle.Render(s.selectedInstance.Name))
-	}
-
-	prompt := styles.HelpStyle.Render("y (Confirm) / n (Cancel)")
-
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		styles.WarningStyle.Render(actionTitle),
-		"\n",
-		actionText,
-		"\n",
-		prompt,
-	)
-
-	dialog := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorWarning).
-		Padding(1, 4).
-		Render(content)
-
-	return lipgloss.Place(
-		80, 20,
-		lipgloss.Center, lipgloss.Center,
-		dialog,
-	)
+	return components.RenderConfirmation(s.pendingAction, s.selectedInstance.Name, "instance")
 }
 
 func renderState(state InstanceState) string {

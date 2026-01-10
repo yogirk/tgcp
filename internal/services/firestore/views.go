@@ -5,22 +5,30 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 func (s *Service) View() string {
 	if s.loading && len(s.dbs) == 0 {
-		return "Loading Firestore Databases..."
+		return components.RenderSpinner("Loading Firestore Databases...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, "Firestore", "Databases")
 	}
 
 	if s.viewState == ViewDetail {
 		return s.renderDetailView()
 	}
 
-	return s.table.View()
+	// Filter Bar
+	var content strings.Builder
+	if s.filter.IsActive() || s.filter.Value() != "" {
+		content.WriteString(s.filter.View())
+		content.WriteString("\n")
+	}
+	content.WriteString(s.table.View())
+	return content.String()
 }
 
 func (s *Service) renderDetailView() string {

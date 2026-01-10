@@ -7,10 +7,10 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rk/tgcp/internal/config"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/ui"
-	"github.com/rk/tgcp/internal/utils"
+	"github.com/yogirk/tgcp/internal/config"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui"
+	"github.com/yogirk/tgcp/internal/utils"
 )
 
 func main() {

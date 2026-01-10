@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rk/tgcp/internal/utils"
+	"github.com/yogirk/tgcp/internal/utils"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
 )

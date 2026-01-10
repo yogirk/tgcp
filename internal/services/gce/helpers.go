@@ -1,9 +1,8 @@
 package gce
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) updateTable(instances []Instance) {
@@ -31,32 +30,12 @@ func (s *Service) updateTable(instances []Instance) {
 	// s.table.SetCursor(0) // Don't reset cursor on every update, preserves selection on refresh
 }
 
-// filterInstances updates the filtered list based on query
-func (s *Service) filterInstances(query string) {
+// getFilteredInstances returns filtered instances based on the query string
+func (s *Service) getFilteredInstances(instances []Instance, query string) []Instance {
 	if query == "" {
-		s.filtered = nil
-		s.updateTable(s.instances)
-		return
+		return instances
 	}
-
-	var matches []Instance
-	for _, inst := range s.instances {
-		if contains(inst.Name, query) || contains(inst.Zone, query) {
-			matches = append(matches, inst)
-		}
-	}
-	s.filtered = matches
-	s.updateTable(s.filtered)
-}
-
-// getCurrentInstances returns the currently visible instances
-func (s *Service) getCurrentInstances() []Instance {
-	if s.filtered != nil || s.filterInput.Value() != "" {
-		return s.filtered
-	}
-	return s.instances
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+	return components.FilterSlice(instances, query, func(inst Instance, q string) bool {
+		return components.ContainsMatch(inst.Name, inst.Zone, inst.InternalIP, inst.ExternalIP)(q)
+	})
 }

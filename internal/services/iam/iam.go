@@ -8,9 +8,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 5 * time.Minute
@@ -22,7 +21,7 @@ type tickMsg time.Time
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
 
 	// State
 	accounts []ServiceAccount
@@ -46,20 +45,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "ID", Width: 25},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-
-	t.SetStyles(s)
+	t := components.NewStandardTable(columns)
 
 	return &Service{
 		table: t,
@@ -84,24 +70,10 @@ func (s *Service) HelpText() string {
 
 func (s *Service) Focus() {
 	s.table.Focus()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Background(lipgloss.Color("237")).
-		Bold(false)
-	s.table.SetStyles(st)
 }
 
 func (s *Service) InitService(ctx context.Context, projectID string) error {
@@ -112,6 +84,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	}
 	s.client = client
 	return nil
+}
+
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
 }
 
 func (s *Service) Init() tea.Cmd {
@@ -146,12 +124,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
 		if s.viewDetail {
@@ -173,7 +146,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.viewDetail = true
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 		}
 	}
@@ -183,10 +158,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading {
-		return "Loading Service Accounts..."
+		return components.RenderSpinner("Loading Service Accounts...")
 	}
 	if s.err != nil {
-		return "Error: " + s.err.Error()
+		return components.RenderError(s.err, s.Name(), "Service Accounts")
 	}
 
 	if s.viewDetail {

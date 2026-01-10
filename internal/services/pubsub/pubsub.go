@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 60 * time.Second
@@ -41,10 +39,9 @@ type errMsg error
 type Service struct {
 	client    *Client
 	projectID string
-	table     table.Model
+	table     *components.StandardTable
 
-	filterInput textinput.Model
-	filtering   bool
+	filter components.FilterModel
 
 	topics []Topic
 	subs   []Subscription
@@ -66,31 +63,13 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "KMS Key", Width: 30},
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	ti := textinput.New()
-	ti.Placeholder = "Filter..."
-	ti.Prompt = "/ "
-	ti.CharLimit = 100
-	ti.Width = 50
+	t := components.NewStandardTable(columns)
 
 	return &Service{
-		table:       t,
-		filterInput: ti,
-		viewState:   ViewListTopics,
-		cache:       cache,
+		table:     t,
+		filter:     components.NewFilterWithPlaceholder("Filter topics/subscriptions..."),
+		viewState: ViewListTopics,
+		cache:     cache,
 	}
 }
 
@@ -126,6 +105,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
 }
@@ -149,8 +134,7 @@ func (s *Service) Reset() {
 	s.selectedSub = nil
 	s.err = nil
 	s.table.SetCursor(0)
-	s.filtering = false
-	s.filterInput.Reset()
+	s.filter.ExitFilterMode()
 	s.updateTopicTable(s.topics) // Reset cols
 }
 
@@ -160,19 +144,10 @@ func (s *Service) IsRootView() bool {
 
 func (s *Service) Focus() {
 	s.table.Focus()
-	// Style reset
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57"))
-	s.table.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.table.Blur()
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(styles.ColorText).Background(lipgloss.Color("237"))
-	s.table.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -207,43 +182,48 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.table.SetHeight(newHeight)
+		s.table.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
-		if s.filtering {
-			switch msg.String() {
-			case "esc":
-				s.filtering = false
-				s.filterInput.Blur()
-				s.filterInput.Reset()
-				if s.viewState == ViewListTopics {
-					s.updateTopicTable(s.topics)
-				} else {
-					s.updateSubTable(s.subs)
-				}
-				return s, nil
-			case "enter":
-				s.filtering = false
-				s.filterInput.Blur()
-				return s, nil
+		// Handle filter mode (only in list views)
+		if s.viewState == ViewListTopics || s.viewState == ViewListSubs {
+			var result components.FilterUpdateResult
+			if s.viewState == ViewListTopics {
+				result = components.HandleFilterUpdate(
+					&s.filter,
+					msg,
+					s.topics,
+					func(items []Topic, query string) []Topic {
+						return s.getFilteredTopics(items, query)
+					},
+					s.updateTopicTable,
+				)
+			} else {
+				result = components.HandleFilterUpdate(
+					&s.filter,
+					msg,
+					s.subs,
+					func(items []Subscription, query string) []Subscription {
+						return s.getFilteredSubs(items, query)
+					},
+					s.updateSubTable,
+				)
 			}
-			var inputCmd tea.Cmd
-			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			return s, inputCmd
+
+			if result.Handled {
+				if result.Cmd != nil {
+					return s, result.Cmd
+				}
+				if !result.ShouldContinue {
+					return s, nil
+				}
+				// Continue processing other keys
+			}
 		}
 
 		// Root Views (Topics or Subs)
 		if s.viewState == ViewListTopics || s.viewState == ViewListSubs {
 			switch msg.String() {
-			case "/":
-				s.filtering = true
-				s.filterInput.Focus()
-				return s, textinput.Blink
 			case "r":
 				return s, s.Refresh()
 			case "s": // Switch to Subs
@@ -266,18 +246,22 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter":
 				if s.viewState == ViewListTopics {
-					if idx := s.table.Cursor(); idx >= 0 && idx < len(s.topics) {
-						s.selectedTopic = &s.topics[idx]
+					topics := s.getFilteredTopics(s.topics, s.filter.Value())
+					if idx := s.table.Cursor(); idx >= 0 && idx < len(topics) {
+						s.selectedTopic = &topics[idx]
 						s.viewState = ViewDetailTopic
 					}
 				} else {
-					if idx := s.table.Cursor(); idx >= 0 && idx < len(s.subs) {
-						s.selectedSub = &s.subs[idx]
+					subs := s.getFilteredSubs(s.subs, s.filter.Value())
+					if idx := s.table.Cursor(); idx >= 0 && idx < len(subs) {
+						s.selectedSub = &subs[idx]
 						s.viewState = ViewDetailSub
 					}
 				}
 			}
-			s.table, cmd = s.table.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
 			return s, cmd
 		}
 
@@ -403,4 +387,24 @@ func (s *Service) updateSubTable(items []Subscription) {
 		}
 	}
 	s.table.SetRows(rows)
+}
+
+// getFilteredTopics returns filtered topics based on the query string
+func (s *Service) getFilteredTopics(topics []Topic, query string) []Topic {
+	if query == "" {
+		return topics
+	}
+	return components.FilterSlice(topics, query, func(topic Topic, q string) bool {
+		return components.ContainsMatch(topic.Name, topic.KmsKeyName)(q)
+	})
+}
+
+// getFilteredSubs returns filtered subscriptions based on the query string
+func (s *Service) getFilteredSubs(subs []Subscription, query string) []Subscription {
+	if query == "" {
+		return subs
+	}
+	return components.FilterSlice(subs, query, func(sub Subscription, q string) bool {
+		return components.ContainsMatch(sub.Name, sub.Topic, sub.PushEndpoint)(q)
+	})
 }

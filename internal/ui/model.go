@@ -5,27 +5,27 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rk/tgcp/internal/config"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/services"
-	"github.com/rk/tgcp/internal/services/bigquery"
-	"github.com/rk/tgcp/internal/services/bigtable"
-	"github.com/rk/tgcp/internal/services/cloudrun"
-	"github.com/rk/tgcp/internal/services/cloudsql"
-	"github.com/rk/tgcp/internal/services/dataflow"
-	"github.com/rk/tgcp/internal/services/dataproc"
-	"github.com/rk/tgcp/internal/services/disks"
-	"github.com/rk/tgcp/internal/services/firestore"
-	"github.com/rk/tgcp/internal/services/gce"
-	"github.com/rk/tgcp/internal/services/gcs"
-	"github.com/rk/tgcp/internal/services/gke"
-	"github.com/rk/tgcp/internal/services/iam"
-	"github.com/rk/tgcp/internal/services/net"
-	"github.com/rk/tgcp/internal/services/overview"
-	"github.com/rk/tgcp/internal/services/pubsub"
-	"github.com/rk/tgcp/internal/services/redis"
-	"github.com/rk/tgcp/internal/services/spanner"
-	"github.com/rk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/config"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/services"
+	"github.com/yogirk/tgcp/internal/services/bigquery"
+	"github.com/yogirk/tgcp/internal/services/bigtable"
+	"github.com/yogirk/tgcp/internal/services/cloudrun"
+	"github.com/yogirk/tgcp/internal/services/cloudsql"
+	"github.com/yogirk/tgcp/internal/services/dataflow"
+	"github.com/yogirk/tgcp/internal/services/dataproc"
+	"github.com/yogirk/tgcp/internal/services/disks"
+	"github.com/yogirk/tgcp/internal/services/firestore"
+	"github.com/yogirk/tgcp/internal/services/gce"
+	"github.com/yogirk/tgcp/internal/services/gcs"
+	"github.com/yogirk/tgcp/internal/services/gke"
+	"github.com/yogirk/tgcp/internal/services/iam"
+	"github.com/yogirk/tgcp/internal/services/net"
+	"github.com/yogirk/tgcp/internal/services/overview"
+	"github.com/yogirk/tgcp/internal/services/pubsub"
+	"github.com/yogirk/tgcp/internal/services/redis"
+	"github.com/yogirk/tgcp/internal/services/spanner"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 // ViewMode defines the high-level view state
@@ -73,6 +73,7 @@ type MainModel struct {
 
 	// External Managers
 	ProjectManager *core.ProjectManager
+	ServiceRegistry *core.ServiceRegistry
 }
 
 // InitialModel returns the initial state of the application
@@ -80,143 +81,29 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 	// Initialize Cache
 	cache := core.NewCache()
 
-	// Initialize Services
-	svcMap := make(map[string]services.Service)
+	// Create service registry and register all services
+	registry := core.NewServiceRegistry(cache)
+	registerAllServices(registry)
 
-	// Create Overview Service
-	billingSvc := overview.NewService(cache)
-	if authState.ProjectID != "" {
-		billingSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["overview"] = billingSvc
-
-	// Create GCE Service
-	gceSvc := gce.NewService(cache)
-	if authState.ProjectID != "" {
-		gceSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["gce"] = gceSvc
-
-	// Create GKE Service
-	gkeSvc := gke.NewService(cache)
-	if authState.ProjectID != "" {
-		gkeSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["gke"] = gkeSvc
-
-	// Create Disks Service
-	diskSvc := disks.NewService(cache)
-	if authState.ProjectID != "" {
-		diskSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["disks"] = diskSvc
-
-	// Create Pub/Sub Service
-	psSvc := pubsub.NewService(cache)
-	if authState.ProjectID != "" {
-		psSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["pubsub"] = psSvc
-
-	// Create Redis Service
-	redisSvc := redis.NewService(cache)
-	if authState.ProjectID != "" {
-		redisSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["redis"] = redisSvc
-
-	// Create Spanner Service
-	spannerSvc := spanner.NewService(cache)
-	if authState.ProjectID != "" {
-		spannerSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["spanner"] = spannerSvc
-
-	// Create Bigtable Service
-	btSvc := bigtable.NewService(cache)
-	if authState.ProjectID != "" {
-		btSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["bigtable"] = btSvc
-
-	// Create Dataflow Service
-	dfSvc := dataflow.NewService(cache)
-	if authState.ProjectID != "" {
-		dfSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["dataflow"] = dfSvc
-
-	// Create Dataproc Service
-	dpSvc := dataproc.NewService(cache)
-	if authState.ProjectID != "" {
-		dpSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["dataproc"] = dpSvc
-
-	// Create Firestore Service
-	fsSvc := firestore.NewService(cache)
-	if authState.ProjectID != "" {
-		fsSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["firestore"] = fsSvc
-
-	// Create Cloud SQL Service
-	sqlSvc := cloudsql.NewService(cache)
-	if authState.ProjectID != "" {
-		sqlSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["sql"] = sqlSvc
-
-	// Create IAM Service
-	iamSvc := iam.NewService(cache)
-	if authState.ProjectID != "" {
-		iamSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["iam"] = iamSvc
-
-	// Create Cloud Run Service
-	runSvc := cloudrun.NewService(cache)
-	if authState.ProjectID != "" {
-		runSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["run"] = runSvc
-
-	// Create GCS Service
-	gcsSvc := gcs.NewService(cache)
-	if authState.ProjectID != "" {
-		gcsSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["gcs"] = gcsSvc
-
-	// Create BigQuery Service
-	bqSvc := bigquery.NewService(cache)
-	if authState.ProjectID != "" {
-		bqSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["bq"] = bqSvc
-
-	// Create Networking Service
-	netSvc := net.NewService(cache)
-	if authState.ProjectID != "" {
-		netSvc.InitService(context.Background(), authState.ProjectID)
-	}
-	svcMap["net"] = netSvc
+	// Initialize all services
+	svcMap := registry.InitializeAll(context.Background(), authState.ProjectID)
 
 	// Initialize Components
 	sb := components.NewSidebar()
 	sb.Visible = cfg.UI.SidebarVisible
 
 	return MainModel{
-		AuthState:      authState,
-		Navigation:     core.NewNavigation(),
-		Sidebar:        sb,
-		HomeMenu:       components.NewHomeMenu(),
-		StatusBar:      components.NewStatusBar(),
-		Palette:        components.NewPalette(),
-		Focus:          FocusSidebar,
-		ViewMode:       ViewHome,
-		ServiceMap:     svcMap,
-		ProjectManager: core.NewProjectManager(cache),
+		AuthState:       authState,
+		Navigation:      core.NewNavigation(),
+		Sidebar:         sb,
+		HomeMenu:        components.NewHomeMenu(),
+		StatusBar:       components.NewStatusBar(),
+		Palette:         components.NewPalette(),
+		Focus:           FocusSidebar,
+		ViewMode:        ViewHome,
+		ServiceMap:      svcMap,
+		ProjectManager:  core.NewProjectManager(cache),
+		ServiceRegistry: registry,
 	}
 }
 
@@ -315,28 +202,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							newProjectID := route.ID[15:]
 							m.AuthState.ProjectID = newProjectID
 
-							// Re-init Services
-							// Ideally we should have a ReinitAll method, but for now loop
-							for _, svc := range m.ServiceMap {
-								// We need to type assert to set context/project if InitService is the way
-								// Or just call InitService again?
-								// Looking at InitialModel, we call InitService(ctx, projectID)
-								// We need to do that here.
-								// We can iterate and switch based on ShortName or try type assertion
-								if s, ok := svc.(interface {
-									InitService(context.Context, string) error
-								}); ok {
-									// Run in background? Service init might be blocking?
-									// Most InitService just create client.
-									// Let's do it synchronously for now or wrap in Cmd?
-									// Wrapping in Cmd is better for responsiveness but tricky to synchronize.
-									// Let's do sync for MVP.
-									if err := s.InitService(context.Background(), newProjectID); err != nil {
-										m.StatusBar.Message = "Error initializing service " + svc.ShortName() + ": " + err.Error()
-										m.StatusBar.IsError = true
-									}
-								}
-								svc.Reset()
+							// Re-initialize all services with new project using registry
+							if m.ServiceRegistry != nil {
+								m.ServiceRegistry.ReinitializeAll(context.Background(), newProjectID, m.ServiceMap)
 							}
 
 							m.StatusBar.Message = "Switched to project: " + newProjectID
@@ -650,3 +518,59 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the current UI based on state
 // See home.go for the actual view logic
+
+// registerAllServices registers all available services with the registry
+// This is kept in the ui package to avoid import cycles (services import core, core shouldn't import services)
+func registerAllServices(registry *core.ServiceRegistry) {
+	registry.Register("overview", func(cache *core.Cache) services.Service {
+		return overview.NewService(cache)
+	})
+	registry.Register("gce", func(cache *core.Cache) services.Service {
+		return gce.NewService(cache)
+	})
+	registry.Register("gke", func(cache *core.Cache) services.Service {
+		return gke.NewService(cache)
+	})
+	registry.Register("disks", func(cache *core.Cache) services.Service {
+		return disks.NewService(cache)
+	})
+	registry.Register("pubsub", func(cache *core.Cache) services.Service {
+		return pubsub.NewService(cache)
+	})
+	registry.Register("redis", func(cache *core.Cache) services.Service {
+		return redis.NewService(cache)
+	})
+	registry.Register("spanner", func(cache *core.Cache) services.Service {
+		return spanner.NewService(cache)
+	})
+	registry.Register("bigtable", func(cache *core.Cache) services.Service {
+		return bigtable.NewService(cache)
+	})
+	registry.Register("dataflow", func(cache *core.Cache) services.Service {
+		return dataflow.NewService(cache)
+	})
+	registry.Register("dataproc", func(cache *core.Cache) services.Service {
+		return dataproc.NewService(cache)
+	})
+	registry.Register("firestore", func(cache *core.Cache) services.Service {
+		return firestore.NewService(cache)
+	})
+	registry.Register("sql", func(cache *core.Cache) services.Service {
+		return cloudsql.NewService(cache)
+	})
+	registry.Register("iam", func(cache *core.Cache) services.Service {
+		return iam.NewService(cache)
+	})
+	registry.Register("run", func(cache *core.Cache) services.Service {
+		return cloudrun.NewService(cache)
+	})
+	registry.Register("gcs", func(cache *core.Cache) services.Service {
+		return gcs.NewService(cache)
+	})
+	registry.Register("bq", func(cache *core.Cache) services.Service {
+		return bigquery.NewService(cache)
+	})
+	registry.Register("net", func(cache *core.Cache) services.Service {
+		return net.NewService(cache)
+	})
+}

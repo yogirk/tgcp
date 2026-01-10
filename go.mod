@@ -1,4 +1,4 @@
-module github.com/rk/tgcp
+module github.com/yogirk/tgcp
 
 go 1.25.5
 

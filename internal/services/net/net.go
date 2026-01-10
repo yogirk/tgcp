@@ -9,8 +9,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/ui/components"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 const CacheTTL = 5 * time.Minute
@@ -49,9 +50,9 @@ type Service struct {
 	projectID string
 
 	// Tables
-	networksTable  table.Model
-	subnetsTable   table.Model
-	firewallsTable table.Model
+	networksTable  *components.StandardTable
+	subnetsTable   *components.StandardTable
+	firewallsTable *components.StandardTable
 
 	// UI
 	filterInput textinput.Model
@@ -78,7 +79,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "IPv4 Range", Width: 20},
 		{Title: "Gateway", Width: 15},
 	}
-	nTable := table.New(table.WithColumns(nCols), table.WithFocused(true), table.WithHeight(10))
+	nTable := components.NewStandardTable(nCols)
 
 	// Subnets Table
 	sCols := []table.Column{
@@ -87,7 +88,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Range", Width: 15},
 		{Title: "Gateway", Width: 15},
 	}
-	sTable := table.New(table.WithColumns(sCols), table.WithFocused(true), table.WithHeight(10))
+	sTable := components.NewStandardTable(sCols)
 
 	// Firewalls Table
 	fCols := []table.Column{
@@ -98,15 +99,7 @@ func NewService(cache *core.Cache) *Service {
 		{Title: "Source", Width: 20},
 		{Title: "Target", Width: 20},
 	}
-	fTable := table.New(table.WithColumns(fCols), table.WithFocused(true), table.WithHeight(10))
-
-	// Apply Styles
-	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
-	s.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
-	nTable.SetStyles(s)
-	sTable.SetStyles(s)
-	fTable.SetStyles(s)
+	fTable := components.NewStandardTable(fCols)
 
 	return &Service{
 		networksTable:  nTable,
@@ -145,6 +138,12 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
+}
+
 func (s *Service) Init() tea.Cmd {
 	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
@@ -176,26 +175,12 @@ func (s *Service) Focus() {
 	s.networksTable.Focus()
 	s.subnetsTable.Focus()
 	s.firewallsTable.Focus()
-
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
-	s.networksTable.SetStyles(st)
-	s.subnetsTable.SetStyles(st)
-	s.firewallsTable.SetStyles(st)
 }
 
 func (s *Service) Blur() {
 	s.networksTable.Blur()
 	s.subnetsTable.Blur()
 	s.firewallsTable.Blur()
-
-	st := table.DefaultStyles()
-	st.Header = styles.HeaderStyle
-	st.Selected = lipgloss.NewStyle().Foreground(styles.ColorText).Background(lipgloss.Color("237")).Bold(false)
-	s.networksTable.SetStyles(st)
-	s.subnetsTable.SetStyles(st)
-	s.firewallsTable.SetStyles(st)
 }
 
 // -----------------------------------------------------------------------------
@@ -234,13 +219,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		h := msg.Height - 6 // Header space
-		if h < 5 {
-			h = 5
-		}
-		s.networksTable.SetHeight(h)
-		s.subnetsTable.SetHeight(h - 3) // Tab headers take extra space
-		s.firewallsTable.SetHeight(h - 3)
+		s.networksTable.HandleWindowSizeDefault(msg)
+		// Tab headers take extra space for detail view tables
+		s.subnetsTable.HandleWindowSize(msg, 9)
+		s.firewallsTable.HandleWindowSize(msg, 9)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -258,7 +240,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, tea.Batch(s.fetchSubnetsCmd(), s.fetchFirewallsCmd())
 				}
 			}
-			s.networksTable, cmd = s.networksTable.Update(msg)
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.networksTable.Update(msg)
+			s.networksTable = updatedTable
 			return s, cmd
 
 		} else if s.viewState == ViewDetail {
@@ -276,13 +260,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return s, nil
 			}
 
+			var updatedTable *components.StandardTable
 			if s.activeTab == TabSubnets {
-				s.subnetsTable, cmd = s.subnetsTable.Update(msg)
-				return s, cmd
+				updatedTable, cmd = s.subnetsTable.Update(msg)
+				s.subnetsTable = updatedTable
 			} else {
-				s.firewallsTable, cmd = s.firewallsTable.Update(msg)
-				return s, cmd
+				updatedTable, cmd = s.firewallsTable.Update(msg)
+				s.firewallsTable = updatedTable
 			}
+			return s, cmd
 		}
 	}
 	return s, nil
@@ -294,10 +280,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *Service) View() string {
 	if s.loading {
-		return "Loading Networking..."
+		return components.RenderSpinner("Loading Networking...")
 	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Networks")
 	}
 
 	if s.viewState == ViewList {
