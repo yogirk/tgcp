@@ -67,7 +67,7 @@ func HelpView(width, height int) string {
 
 		// Section header
 		header := styles.TitleStyle.Copy().
-			Foreground(styles.ColorHighlight).
+			Foreground(styles.ColorBrandAccent).
 			Bold(true).
 			Underline(true).
 			Render(section.title)
@@ -76,13 +76,13 @@ func HelpView(width, height int) string {
 		// Items
 		for _, item := range section.items {
 			key := lipgloss.NewStyle().
-				Foreground(styles.ColorPrimary).
+				Foreground(styles.ColorBrandPrimary).
 				Bold(true).
 				Width(keyWidth).
 				Render(item[0])
 
 			desc := lipgloss.NewStyle().
-				Foreground(styles.ColorText).
+				Foreground(styles.ColorTextPrimary).
 				Render(item[1])
 
 			col.WriteString(key + desc + "\n")
@@ -105,7 +105,7 @@ func HelpView(width, height int) string {
 
 	// Build final dialog
 	title := styles.TitleStyle.Copy().
-		Foreground(styles.ColorPrimary).
+		Foreground(styles.ColorBrandPrimary).
 		Render("TGCP Help & Keybindings")
 
 	// Get Banner
@@ -116,7 +116,7 @@ func HelpView(width, height int) string {
 	dialog := styles.BoxStyle.Copy().
 		Width(dialogWidth).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorPrimary).
+		BorderForeground(styles.ColorBrandPrimary).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Center,
 			banner,

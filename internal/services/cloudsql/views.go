@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -56,15 +55,5 @@ func (s *Service) renderConfirmation() string {
 }
 
 func renderState(state InstanceState) string {
-	str := string(state)
-	switch state {
-	case StateRunnable:
-		return styles.SuccessStyle.Render("● " + str)
-	case StateSuspended, StatePending:
-		return styles.WarningStyle.Render("● " + str)
-	case StateFailed:
-		return styles.ErrorStyle.Render("● " + str)
-	default:
-		return str
-	}
+	return components.RenderStatus(string(state))
 }

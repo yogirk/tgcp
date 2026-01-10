@@ -4,23 +4,15 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Semantic colors
-	ColorBrandPrimary = lipgloss.Color("33")  // GCP Blue
-	ColorBrandAccent  = lipgloss.Color("39")  // Light Blue
+	ColorBrandPrimary = lipgloss.Color("39")  // GCP Blue (brighter)
+	ColorBrandAccent  = lipgloss.Color("75")  // Light Blue (for highlights)
 	ColorTextPrimary  = lipgloss.Color("252") // Near white
-	ColorTextMuted    = lipgloss.Color("245") // Muted grey
-	ColorBorderSubtle = lipgloss.Color("238") // Subtle border
+	ColorTextMuted    = lipgloss.Color("243") // Muted grey (more contrast from primary)
+	ColorBorderSubtle = lipgloss.Color("240") // Subtle border (more visible)
 	ColorSuccess      = lipgloss.Color("42")  // Green
 	ColorWarning      = lipgloss.Color("214") // Orange
 	ColorError        = lipgloss.Color("196") // Red
 	ColorInfo         = lipgloss.Color("45")  // Cyan
-
-	// Legacy aliases (keep for compatibility; prefer semantic names above)
-	ColorPrimary   = ColorBrandPrimary
-	ColorSecondary = ColorBorderSubtle
-	ColorText      = ColorTextPrimary
-	ColorSubtext   = ColorTextMuted
-	ColorHighlight = ColorBrandAccent
-	ColorAccent    = ColorBrandAccent
 
 	// Base Styles
 	BaseStyle = lipgloss.NewStyle().
@@ -36,7 +28,9 @@ var (
 			BorderForeground(ColorBrandPrimary)
 
 	HeaderStyle = lipgloss.NewStyle().
-			Foreground(ColorTextMuted).
+			Foreground(ColorTextPrimary).
+			Background(lipgloss.Color("237")).
+			Bold(true).
 			Padding(0, 1)
 
 	TitleStyle = lipgloss.NewStyle().

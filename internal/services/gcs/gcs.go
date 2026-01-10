@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -403,7 +402,7 @@ func (s *Service) renderDetailView() string {
 	})
 
 	// Action Bar
-	actions := styles.HelpStyle.Render("Enter Browse Objects | q Back")
+	actions := components.RenderFooterHint("Enter Browse Objects | q Back")
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		title,

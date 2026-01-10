@@ -73,17 +73,17 @@ func (m HomeMenuModel) View() string {
 
 		var renderedItem string
 		if isSelected {
-			// Selected Item: Highlighted with a pointer
+			// Selected Item: Highlighted with arrow indicator
 			renderedItem = styles.SelectedItemStyle.Copy().
 				UnsetBorderLeft().
-				Render("👉 " + name)
+				Render("▸ " + name)
 		} else {
 			// Unselected Item: Dimmed
 			style := styles.UnselectedItemStyle.Copy().
 				PaddingLeft(2) // indent to match pointer
 
 			if item.IsComing {
-				style = style.Foreground(styles.ColorSubtext)
+				style = style.Foreground(styles.ColorTextMuted)
 			}
 			renderedItem = style.Render(name)
 		}
@@ -101,7 +101,7 @@ func (m HomeMenuModel) View() string {
 
 	// Wrap in a card/box
 	menuBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorSubtext).
+		BorderForeground(styles.ColorTextMuted).
 		Padding(1, 2).
 		Render(content)
 

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -41,11 +40,6 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if i.State != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
 	breadcrumb := components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
 		s.Name(),
@@ -62,7 +56,7 @@ func (s *Service) renderDetailView() string {
 		Title: "Instance Details",
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: i.Name},
-			{Key: "Status", Value: styles.BaseStyle.Foreground(statusColor).Render(i.State)},
+			{Key: "Status", Value: components.RenderStatus(i.State)},
 			{Key: "Display Name", Value: i.DisplayName},
 			{Key: "Configuration", Value: i.Config},
 			{Key: "Capacity", Value: capacity},

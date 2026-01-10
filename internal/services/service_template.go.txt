@@ -50,7 +50,7 @@ type actionResultMsg struct{ err error }
 
 // Service implements the services.Service interface
 type Service struct {
-	client    *Client // Your API Client
+	client    *Client // Your API Client (placeholder type)
 	projectID string
 	table     *components.StandardTable
 
@@ -74,6 +74,9 @@ type Service struct {
 	// Cache
 	cache *core.Cache
 }
+
+// Placeholder Client type
+type Client struct{}
 
 // NewService creates a new instance of the service
 func NewService(cache *core.Cache) *Service {
@@ -284,7 +287,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, nil
 }
 
-// ----------------------------------------------------------------------------- 
+// -----------------------------------------------------------------------------
 // View Rendering
 // -----------------------------------------------------------------------------
 
@@ -381,7 +384,7 @@ func (s *Service) getFilteredItems(items []ExampleItem, query string) []ExampleI
 }
 
 // renderDetailView renders the detail view for a selected item
-// Example implementation:
+// Uses DetailCard for consistent styling with auto-status detection
 func (s *Service) renderDetailView() string {
 	if s.selectedItem == nil {
 		return "Error: No item selected"
@@ -394,23 +397,22 @@ func (s *Service) renderDetailView() string {
 		s.selectedItem.Name,
 	)
 
-	// Use lipgloss for styling
-	title := styles.TitleStyle.Render(s.selectedItem.Name)
+	// Use DetailCard for consistent styling
+	// Note: "Status" fields are auto-rendered with badge styling
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Item Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: s.selectedItem.Name},
+			{Key: "Status", Value: s.selectedItem.Status}, // Auto-styled as badge
+			{Key: "ID", Value: s.selectedItem.ID},
+		},
+	})
 
-	// Build detail content
-	var content strings.Builder
-	content.WriteString(title + "\n\n")
-	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
-	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
+	// Use RenderFooterHint for consistent keyboard hint styling
+	// Format: "key Action | key Action" -> "[key] Action  [key] Action"
+	actions := components.RenderFooterHint("s Start | x Stop | q Back")
 
-	// Wrap in a styled box
-	box := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
-		Width(60).
-		Render(content.String())
-
-	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", box)
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card, "", actions)
 }
 
 // performActionCmd is an example of how to implement action commands
@@ -431,21 +433,3 @@ func (s *Service) performActionCmd(action string) tea.Cmd {
 		return actionResultMsg{err: nil}
 	}
 }
-
-// If your service needs multiple tables (e.g., buckets and objects):
-/*
-type Service struct {
-	// ... other fields ...
-	table      *components.StandardTable  // Main table
-	objectTable *components.StandardTable // Secondary table
-}
-
-func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		s.table.HandleWindowSizeDefault(msg)
-		s.objectTable.HandleWindowSizeDefault(msg) // Handle both tables
-	// ... rest of update logic
-	}
-}
-*/

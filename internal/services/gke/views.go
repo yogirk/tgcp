@@ -37,14 +37,9 @@ func (s *Service) renderDetailView() string {
 	// 2. Node Pools Box
 	var poolLines []string
 	for _, p := range c.NodePools {
-		statusIcon := "🟢"
-		if p.Status != "RUNNING" && p.Status != "RUNNABLE" {
-			statusIcon = "🟡"
-		}
-
 		spotLabel := ""
 		if p.IsSpot {
-			spotLabel = "⚠️ SPOT"
+			spotLabel = styles.WarningStyle.Render(" SPOT")
 		}
 
 		poolParams := fmt.Sprintf(
@@ -57,7 +52,7 @@ func (s *Service) renderDetailView() string {
 			autoScaling = fmt.Sprintf("  Autoscaling: %d - %d nodes", p.Autoscaling.MinNodeCount, p.Autoscaling.MaxNodeCount)
 		}
 
-		line := fmt.Sprintf("%s %s %s\n%s", statusIcon, p.Name, spotLabel, poolParams)
+		line := fmt.Sprintf("%s %s%s\n%s", components.RenderStatus(p.Status), p.Name, spotLabel, poolParams)
 		if autoScaling != "" {
 			line += "\n" + autoScaling
 		}

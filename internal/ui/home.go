@@ -71,7 +71,7 @@ func renderLandingPage(m MainModel) string {
 	)
 	infoBox := styles.BoxStyle.Copy().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorSecondary).
+		BorderForeground(styles.ColorBorderSubtle).
 		Padding(1).
 		Render(userInfo)
 
@@ -106,7 +106,7 @@ func renderLandingPage(m MainModel) string {
 
 	hints := styles.BoxStyle.Copy().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorSecondary).
+		BorderForeground(styles.ColorBorderSubtle).
 		Padding(1, 2).
 		Render(lipgloss.JoinHorizontal(lipgloss.Top,
 			col1,

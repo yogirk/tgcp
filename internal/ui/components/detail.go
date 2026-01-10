@@ -46,7 +46,7 @@ func DetailCard(opts DetailCardOpts) string {
 
 	parts := []string{title, box}
 	if opts.FooterHint != "" {
-		parts = append(parts, styles.HelpStyle.Render(opts.FooterHint))
+		parts = append(parts, RenderFooterHint(opts.FooterHint))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -64,6 +64,12 @@ func DetailSection(title, body string, borderColor lipgloss.Color) string {
 		Render(content)
 }
 
+// statusKeys are field names that should be auto-rendered as status badges
+var statusKeys = map[string]bool{
+	"Status": true,
+	"State":  true,
+}
+
 func renderKeyValues(rows []KeyValue, keyStyle, valueStyle lipgloss.Style) string {
 	if len(rows) == 0 {
 		return ""
@@ -79,11 +85,64 @@ func renderKeyValues(rows []KeyValue, keyStyle, valueStyle lipgloss.Style) strin
 	for _, row := range rows {
 		key := fmt.Sprintf("%-*s", maxKeyLen+1, row.Key+":")
 		value := row.Value
-		if row.UseValueStyle || !strings.Contains(row.Value, "\x1b") {
+
+		// Auto-render status fields if not already styled
+		if statusKeys[row.Key] && !strings.Contains(row.Value, "\x1b") {
+			value = RenderStatus(row.Value)
+		} else if row.UseValueStyle || !strings.Contains(row.Value, "\x1b") {
 			value = valueStyle.Render(row.Value)
 		}
+
 		line := fmt.Sprintf("%s %s", keyStyle.Render(key), value)
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// RenderFooterHint parses a hint string like "s Start | x Stop | q Back"
+// and renders it with highlighted keys: [s] Start  [x] Stop  [q] Back
+// This function is exported so it can be used by any component that needs
+// styled keyboard hints (not just DetailCard).
+func RenderFooterHint(hint string) string {
+	// Style for the key badge [s]
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("232")).
+		Background(styles.ColorBorderSubtle).
+		Bold(true).
+		Padding(0, 0)
+
+	// Style for the action text
+	actionStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorTextMuted)
+
+	// Split by |
+	parts := strings.Split(hint, "|")
+	var rendered []string
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Split into key and action (first word is key, rest is action)
+		words := strings.SplitN(part, " ", 2)
+		if len(words) == 0 {
+			continue
+		}
+
+		key := words[0]
+		action := ""
+		if len(words) > 1 {
+			action = words[1]
+		}
+
+		// Render as [key] Action
+		keyBadge := keyStyle.Render("[" + key + "]")
+		actionText := actionStyle.Render(action)
+
+		rendered = append(rendered, keyBadge+" "+actionText)
+	}
+
+	return strings.Join(rendered, "  ")
 }

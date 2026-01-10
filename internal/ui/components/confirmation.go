@@ -58,7 +58,7 @@ func (m ConfirmationModel) View() string {
 	}
 
 	// Help text
-	helpText := styles.HelpStyle.Render("y (Confirm) / n (Cancel)")
+	helpText := RenderFooterHint("y Confirm | n Cancel")
 
 	// Combine content
 	content := lipgloss.JoinVertical(

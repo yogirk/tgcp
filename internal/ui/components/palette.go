@@ -60,7 +60,7 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenWidth, screenHeight
 		Width(boxWidth).
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorHighlight) // Pink/Focus color
+		BorderForeground(styles.ColorBrandAccent) // Pink/Focus color
 
 	inputView := inputBoxStyle.Render(m.TextInput.View())
 
@@ -104,14 +104,14 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenWidth, screenHeight
 		suggestionsView = styles.BoxStyle.Copy().
 			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true). // No top border
-			BorderForeground(styles.ColorSubtext).
+			BorderForeground(styles.ColorTextMuted).
 			Render(suggestionsView)
 	} else if m.TextInput.Value() != "" {
 		// No matches
 		suggestionsView = styles.BoxStyle.Copy().
 			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true).
-			BorderForeground(styles.ColorSubtext).
+			BorderForeground(styles.ColorTextMuted).
 			Padding(0, 1).
 			Render(styles.SubtleStyle.Render("No matching commands"))
 	}

@@ -405,19 +405,12 @@ func (s *Service) renderDetailView() string {
 		svc.Name,
 	)
 
-	// Status
-	statusStyle := styles.SuccessStyle
-	if svc.Status != StatusReady {
-		statusStyle = styles.ErrorStyle
-	}
-	status := statusStyle.Render("● " + string(svc.Status))
-
 	card := components.DetailCard(components.DetailCardOpts{
 		Title: "Service Details",
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: svc.Name},
 			{Key: "Region", Value: svc.Region},
-			{Key: "Status", Value: status},
+			{Key: "Status", Value: components.RenderStatus(string(svc.Status))},
 			{Key: "URL", Value: svc.URL},
 		},
 		FooterHint: "Press 'q' or 'esc' to return",
@@ -448,7 +441,7 @@ func (s *Service) renderFuncDetailView() string {
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: f.Name},
 			{Key: "Region", Value: f.Region},
-			{Key: "State", Value: f.State},
+			{Key: "State", Value: components.RenderStatus(f.State)},
 			{Key: "URL", Value: f.URL},
 		},
 		FooterHint: "Press 'q' or 'esc' to return",

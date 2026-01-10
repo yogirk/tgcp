@@ -10,6 +10,7 @@ import (
 type ServiceItem struct {
 	Name      string
 	ShortName string
+	Icon      string
 	Active    bool
 	IsComing  bool
 }
@@ -26,23 +27,23 @@ type SidebarModel struct {
 func NewSidebar() SidebarModel {
 	return SidebarModel{
 		Items: []ServiceItem{
-			{Name: "Overview", ShortName: "overview", Active: true},
-			{Name: "Compute Engine", ShortName: "gce"},
-			{Name: "Disks", ShortName: "disks"},
-			{Name: "Kubernetes Engine", ShortName: "gke"},
-			{Name: "Cloud SQL", ShortName: "sql"},
-			{Name: "IAM", ShortName: "iam"},
-			{Name: "Cloud Run", ShortName: "run"},
-			{Name: "Cloud Storage", ShortName: "gcs"},
-			{Name: "BigQuery", ShortName: "bq"},
-			{Name: "Networking", ShortName: "net"},
-			{Name: "Pub/Sub", ShortName: "pubsub"},
-			{Name: "Memorystore", ShortName: "redis"},
-			{Name: "Spanner", ShortName: "spanner"},
-			{Name: "Bigtable", ShortName: "bigtable"},
-			{Name: "Dataflow", ShortName: "dataflow"},
-			{Name: "Dataproc", ShortName: "dataproc"},
-			{Name: "Firestore", ShortName: "firestore"},
+			{Name: "Overview", ShortName: "overview", Icon: "◉", Active: true},
+			{Name: "Compute Engine", ShortName: "gce", Icon: "⚙"},
+			{Name: "Disks", ShortName: "disks", Icon: "◔"},
+			{Name: "Kubernetes", ShortName: "gke", Icon: "☸"},
+			{Name: "Cloud SQL", ShortName: "sql", Icon: "⛁"},
+			{Name: "IAM", ShortName: "iam", Icon: "⚿"},
+			{Name: "Cloud Run", ShortName: "run", Icon: "▷"},
+			{Name: "Cloud Storage", ShortName: "gcs", Icon: "▤"},
+			{Name: "BigQuery", ShortName: "bq", Icon: "⊞"},
+			{Name: "Networking", ShortName: "net", Icon: "⇄"},
+			{Name: "Pub/Sub", ShortName: "pubsub", Icon: "⇌"},
+			{Name: "Memorystore", ShortName: "redis", Icon: "◇"},
+			{Name: "Spanner", ShortName: "spanner", Icon: "⬡"},
+			{Name: "Bigtable", ShortName: "bigtable", Icon: "▦"},
+			{Name: "Dataflow", ShortName: "dataflow", Icon: "⇢"},
+			{Name: "Dataproc", ShortName: "dataproc", Icon: "⎈"},
+			{Name: "Firestore", ShortName: "firestore", Icon: "◲"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start
@@ -90,9 +91,10 @@ func (m SidebarModel) View() string {
 	doc.WriteString("\n\n")
 
 	for i, item := range m.Items {
-		name := item.Name
+		// Format: "icon name" with consistent spacing
+		displayName := item.Icon + " " + item.Name
 		if item.IsComing {
-			name += " *"
+			displayName += " *"
 		}
 
 		isSelected := m.Cursor == i
@@ -100,17 +102,17 @@ func (m SidebarModel) View() string {
 		var renderedItem string
 		if isSelected {
 			if m.Active {
-				renderedItem = styles.SelectedItemStyle.Render(name)
+				renderedItem = styles.SelectedItemStyle.Render(displayName)
 			} else {
 				// Selected but not focused (dimmed)
-				renderedItem = styles.UnselectedItemStyle.Copy().Foreground(styles.ColorHighlight).Render(name)
+				renderedItem = styles.UnselectedItemStyle.Copy().Foreground(styles.ColorBrandAccent).Render(displayName)
 			}
 		} else {
 			style := styles.UnselectedItemStyle
 			if item.IsComing {
-				style = style.Copy().Foreground(styles.ColorSubtext)
+				style = style.Copy().Foreground(styles.ColorTextMuted)
 			}
-			renderedItem = style.Render(name)
+			renderedItem = style.Render(displayName)
 		}
 
 		doc.WriteString(renderedItem)

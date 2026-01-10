@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -41,11 +40,6 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if c.Status != "RUNNING" {
-		statusColor = styles.ColorWarning
-	}
-
 	breadcrumb := components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
 		s.Name(),
@@ -59,7 +53,7 @@ func (s *Service) renderDetailView() string {
 		Title: "Cluster Details",
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: c.Name},
-			{Key: "Status", Value: styles.BaseStyle.Foreground(statusColor).Render(c.Status)},
+			{Key: "Status", Value: components.RenderStatus(c.Status)},
 			{Key: "Region", Value: DefaultRegion},
 			{Key: "Zone", Value: c.Zone},
 			{Key: "Master", Value: c.MasterMachine},

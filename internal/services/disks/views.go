@@ -15,11 +15,6 @@ func (s *Service) renderDetailView() string {
 	}
 	d := s.selectedDisk
 
-	statusColor := styles.ColorSuccess
-	if d.Status != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
 	breadcrumb := components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
 		s.Name(),
@@ -31,7 +26,7 @@ func (s *Service) renderDetailView() string {
 		Title: "Disk Details",
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: d.Name},
-			{Key: "Status", Value: styles.BaseStyle.Foreground(statusColor).Render(d.Status)},
+			{Key: "Status", Value: components.RenderStatus(d.Status)},
 			{Key: "Zone", Value: d.Zone},
 			{Key: "Created", Value: "N/A"},
 			{Key: "Type", Value: d.ShortType()},

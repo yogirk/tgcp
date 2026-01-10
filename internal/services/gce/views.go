@@ -67,21 +67,7 @@ func (s *Service) renderDetailView() string {
 }
 
 func renderStatus(state InstanceState) string {
-	str := string(state)
-	switch state {
-	case StateRunning:
-		return styles.SuccessStyle.Render("● " + str)
-	case StateStopped, StateTerminated:
-		label := str
-		if state == StateTerminated {
-			label = "STOP"
-		}
-		return styles.ErrorStyle.Render("● " + label)
-	case StateProvisioning, StateStaging, StateStopping, StateSuspending, StateRepairing:
-		return styles.WarningStyle.Render("● " + str)
-	default:
-		return styles.SubtextStyle.Render("● " + str)
-	}
+	return components.RenderStatus(string(state))
 }
 
 // renderConfirmation renders a confirmation dialog

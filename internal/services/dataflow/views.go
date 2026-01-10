@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -41,15 +40,6 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	cleanState := strings.Replace(j.State, "JOB_STATE_", "", 1)
-	statusColor := styles.ColorSuccess
-	if cleanState != "RUNNING" && cleanState != "DONE" {
-		statusColor = styles.ColorWarning
-	}
-	if cleanState == "FAILED" || cleanState == "CANCELLED" {
-		statusColor = styles.ColorError
-	}
-
 	breadcrumb := components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
 		s.Name(),
@@ -63,7 +53,7 @@ func (s *Service) renderDetailView() string {
 			{Key: "Name", Value: j.Name},
 			{Key: "ID", Value: j.ID},
 			{Key: "Type", Value: strings.Replace(j.Type, "JOB_TYPE_", "", 1)},
-			{Key: "State", Value: styles.BaseStyle.Foreground(statusColor).Render(cleanState)},
+			{Key: "State", Value: components.RenderStatus(j.State)},
 			{Key: "Location", Value: j.Location},
 			{Key: "Created", Value: j.CreateTime},
 		},

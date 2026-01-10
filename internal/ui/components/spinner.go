@@ -52,8 +52,8 @@ func (m SpinnerModel) Update(msg tea.Msg) (SpinnerModel, tea.Cmd) {
 // View renders the spinner
 func (m SpinnerModel) View() string {
 	spinnerChar := spinnerFrames[m.Frame]
-	spinner := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render(spinnerChar)
-	
+	spinner := lipgloss.NewStyle().Foreground(styles.ColorBrandPrimary).Render(spinnerChar)
+
 	// Build the message
 	var content string
 	if m.Message != "" {
@@ -61,7 +61,7 @@ func (m SpinnerModel) View() string {
 	} else {
 		content = spinner
 	}
-	
+
 	// Center the content if we have dimensions
 	if m.Width > 0 && m.Height > 0 {
 		return lipgloss.Place(
@@ -70,7 +70,7 @@ func (m SpinnerModel) View() string {
 			content,
 		)
 	}
-	
+
 	return content
 }
 
@@ -92,7 +92,7 @@ func RenderSpinner(message string) string {
 		message = "Loading..."
 	}
 	spinnerChar := spinnerFrames[0] // Use first frame for static version
-	spinner := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render(spinnerChar)
+	spinner := lipgloss.NewStyle().Foreground(styles.ColorBrandPrimary).Render(spinnerChar)
 	return fmt.Sprintf("%s %s", spinner, message)
 }
 
