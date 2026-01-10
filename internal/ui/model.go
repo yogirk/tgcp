@@ -92,13 +92,15 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 	// Initialize Components
 	sb := components.NewSidebar()
 	sb.Visible = cfg.UI.SidebarVisible
+	statusBar := components.NewStatusBar()
+	statusBar.SetFocusPane("HOME")
 
 	return MainModel{
 		AuthState:       authState,
 		Navigation:      core.NewNavigation(),
 		Sidebar:         sb,
 		HomeMenu:        components.NewHomeMenu(),
-		StatusBar:       components.NewStatusBar(),
+		StatusBar:       statusBar,
 		Palette:         components.NewPalette(),
 		Focus:           FocusSidebar,
 		ViewMode:        ViewHome,
@@ -154,6 +156,7 @@ func (m *MainModel) getOrInitializeService(ctx context.Context, serviceName stri
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+	defer m.syncStatusBarFocus()
 
 	switch msg := msg.(type) {
 	// Status Bar Updates
@@ -193,7 +196,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case ":":
 				m.LastFocus = m.Focus
-				m.Focus = FocusPalette
+				m.setFocus(FocusPalette)
 				m.Navigation.PaletteActive = true
 				m.StatusBar.Mode = "COMMAND"
 				m.StatusBar.Message = "Type command..."
@@ -206,7 +209,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Sidebar.Visible = !m.Sidebar.Visible
 					// Adjust focus if hiding active sidebar
 					if !m.Sidebar.Visible && m.Focus == FocusSidebar {
-						m.Focus = FocusMain
+						m.setFocus(FocusMain)
 						m.Sidebar.Active = false
 					}
 				}
@@ -217,7 +220,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Palette specific keys (Esc to close)
 			switch msg.String() {
 			case "esc":
-				m.Focus = m.LastFocus
+				m.setFocus(m.LastFocus)
 				m.Navigation.PaletteActive = false
 				m.StatusBar.Message = "Ready"
 				m.Palette.TextInput.Reset()        // Clear input
@@ -271,7 +274,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							})
 						} else if svc != nil {
 							svc.Reset()
-							svc.Blur()
 							m.CurrentSvc = svc
 
 							// Sync Window Size
@@ -290,8 +292,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							// trigger refresh
 							cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 						}
-						m.Focus = FocusSidebar
-						m.Sidebar.Active = true
+						m.setFocus(FocusMain)
+						m.Sidebar.Active = false
 					} else if route.View == core.ViewProjectSwitcher {
 						// Trigger fetch projects
 						cmds = append(cmds, func() tea.Msg {
@@ -304,16 +306,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Keep palette open? Yes.
 						// Status update?
 						m.StatusBar.Message = "Fetching projects..."
-						m.Focus = FocusPalette
+						m.setFocus(FocusPalette)
 						return m, tea.Batch(cmds...)
 					}
 					// Close Palette
-					m.Focus = m.LastFocus
+					m.setFocus(m.LastFocus)
 					// If we switched view, we might want to focus something specific?
 					// For now, restore last focus (which might be weird if we changed views)
 					// Actually, if we switched service, we force FocusSidebar above.
 					if route.View == core.ViewHome {
-						m.Focus = FocusSidebar // or menu
+						m.setFocus(FocusSidebar) // or menu
 					}
 
 					m.Navigation.PaletteActive = false
@@ -357,9 +359,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 
 					// Switch Context
-					m.Focus = FocusMain // Default focus to content? Or Sidebar? Spec says sidebar default.
-					m.Focus = FocusSidebar
-					m.Sidebar.Active = true
+					m.Sidebar.Active = false
 
 					// Get or initialize service lazily
 					svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
@@ -369,7 +369,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						})
 					} else if svc != nil {
 						svc.Reset() // Reset state (fix Bug 2)
-						svc.Blur()  // Ensure dimmed state initially (Fix UX Focus)
 						m.CurrentSvc = svc
 
 						// Sync Window Size immediately implementation (Fix Bug: Truncated list on entry)
@@ -388,6 +387,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Trigger Refresh
 						cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 					}
+					m.setFocus(FocusMain)
 				}
 				return m, tea.Batch(cmds...)
 			}
@@ -406,6 +406,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.ViewMode = ViewHome
 					m.Sidebar.Active = false
 					m.HomeMenu.IsFocused = true
+					m.setFocus(FocusSidebar)
 					return m, nil
 				}
 				// If not at root (e.g. detailed view), pass 'q' to service
@@ -418,11 +419,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "left":
 					// Always allow escaping to sidebar with Left Arrow
 					if m.Focus == FocusMain {
-						m.Focus = FocusSidebar
+						m.setFocus(FocusSidebar)
 						m.Sidebar.Active = true
-						if m.CurrentSvc != nil {
-							m.CurrentSvc.Blur() // Dim selection
-						}
 						// Do not forward 'left' to service
 						return m, nil
 					}
@@ -435,21 +433,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				case "right", "l":
 					if m.Focus == FocusSidebar && m.Sidebar.Visible {
-						m.Focus = FocusMain
+						m.setFocus(FocusMain)
 						m.Sidebar.Active = false
-						if m.CurrentSvc != nil {
-							m.CurrentSvc.Focus() // Highlight selection
-						}
 						return m, nil
 					}
 				case "enter":
 					// 'enter' in sidebar also moves to main
 					if m.Focus == FocusSidebar && m.Sidebar.Visible {
-						m.Focus = FocusMain
+						m.setFocus(FocusMain)
 						m.Sidebar.Active = false
-						if m.CurrentSvc != nil {
-							m.CurrentSvc.Focus()
-						}
 						return m, nil
 					}
 				}
@@ -536,6 +528,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.CurrentSvc = svc
+				m.setFocus(m.Focus)
 				// Trigger Refresh
 				cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
 			} else {
@@ -650,4 +643,33 @@ func registerAllServices(registry *core.ServiceRegistry) {
 	registry.Register("net", func(cache *core.Cache) services.Service {
 		return net.NewService(cache)
 	})
+}
+
+func (m *MainModel) setFocus(area FocusArea) {
+	m.Focus = area
+	if m.ViewMode == ViewService && m.CurrentSvc != nil {
+		switch area {
+		case FocusMain:
+			m.CurrentSvc.Focus()
+		case FocusSidebar:
+			m.CurrentSvc.Blur()
+		}
+	}
+	m.syncStatusBarFocus()
+}
+
+func (m *MainModel) syncStatusBarFocus() {
+	if m.ViewMode == ViewHome {
+		m.StatusBar.SetFocusPane("HOME")
+		return
+	}
+
+	switch m.Focus {
+	case FocusSidebar:
+		m.StatusBar.SetFocusPane("SIDEBAR")
+	case FocusMain:
+		m.StatusBar.SetFocusPane("MAIN")
+	default:
+		m.StatusBar.SetFocusPane("")
+	}
 }

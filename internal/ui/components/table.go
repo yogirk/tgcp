@@ -10,9 +10,9 @@ import (
 // Standard colors for table selection
 const (
 	TableSelectedFocused = lipgloss.Color("57")  // Purple when focused
-	TableSelectedBlurred = lipgloss.Color("237") // Dark grey when blurred
-	TableTextFocused     = lipgloss.Color("229")  // Light text when focused
-	TableTextBlurred     = lipgloss.Color("252")  // Standard text when blurred
+	TableSelectedBlurred = lipgloss.Color("243") // Neutral grey when blurred
+	TableTextFocused     = lipgloss.Color("229") // Light text when focused
+	TableTextBlurred     = lipgloss.Color("252") // Standard text when blurred
 )
 
 // StandardTable is a standardized table component with built-in Focus/Blur and window size handling
@@ -130,6 +130,13 @@ func (st *StandardTable) HandleWindowSizeDefault(msg tea.WindowSizeMsg) {
 // SetRows sets the table rows
 func (st *StandardTable) SetRows(rows []table.Row) {
 	st.Model.SetRows(rows)
+	if len(rows) == 0 {
+		return
+	}
+	cursor := st.Model.Cursor()
+	if cursor < 0 || cursor >= len(rows) {
+		st.Model.SetCursor(0)
+	}
 }
 
 // SetHeight sets the table height
