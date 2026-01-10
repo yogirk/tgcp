@@ -12,7 +12,6 @@ import (
 
 type PaletteModel struct {
 	TextInput textinput.Model
-	Width     int
 }
 
 func NewPalette() PaletteModel {
@@ -39,11 +38,26 @@ func (m PaletteModel) Update(msg tea.Msg) (PaletteModel, tea.Cmd) {
 }
 
 // Render renders the palette overlay using the provided navigation state
-func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner string) string {
+func (m PaletteModel) Render(nav core.NavigationModel, screenWidth, screenHeight int, banner string) string {
+	if screenWidth <= 0 {
+		screenWidth = 80
+	}
+	if screenHeight <= 0 {
+		screenHeight = 24
+	}
+
+	boxWidth := screenWidth - 6
+	if boxWidth > 72 {
+		boxWidth = 72
+	}
+	if boxWidth < 40 {
+		boxWidth = 40
+	}
+
 	// 1. Input Box
 	// Using a "Search Bar" style (rounded, padded)
 	inputBoxStyle := styles.FocusedBoxStyle.Copy().
-		Width(60).
+		Width(boxWidth).
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(styles.ColorHighlight) // Pink/Focus color
@@ -74,7 +88,7 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 			if i == nav.Selection {
 				// Highlighted
 				content = styles.SelectedItemStyle.Copy().
-					Width(58). // Match box width approx (60 - padding)
+					Width(boxWidth - 2). // Match box width approx (padding)
 					Render(content)
 			} else {
 				// Normal
@@ -88,19 +102,21 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 
 		// Style the dropdown
 		suggestionsView = styles.BoxStyle.Copy().
-			Width(60).
+			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true). // No top border
 			BorderForeground(styles.ColorSubtext).
 			Render(suggestionsView)
 	} else if m.TextInput.Value() != "" {
 		// No matches
 		suggestionsView = styles.BoxStyle.Copy().
-			Width(60).
+			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true).
 			BorderForeground(styles.ColorSubtext).
 			Padding(0, 1).
 			Render(styles.SubtleStyle.Render("No matching commands"))
 	}
+
+	helpHint := styles.SubtleStyle.Render("Esc:Cancel  Enter:Run  ↑/↓:Select")
 
 	// 3. Combine: Banner -> Buffer -> Input -> List
 	// The banner is passed in.
@@ -110,10 +126,12 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 		"\n", // Spacer between banner and search bar
 		inputView,
 		suggestionsView,
+		"\n",
+		helpHint,
 	)
 
-	// 4. Center in Screen
-	return lipgloss.Place(m.Width, screenHeight,
+	// 4. Center in Screen without backdrop to avoid ghosting/shadows
+	return lipgloss.Place(screenWidth, screenHeight,
 		lipgloss.Center, lipgloss.Center,
 		ui,
 	)

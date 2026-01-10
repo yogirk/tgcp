@@ -273,6 +273,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())

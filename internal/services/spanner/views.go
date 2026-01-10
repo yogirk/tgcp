@@ -23,6 +23,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -40,9 +46,11 @@ func (s *Service) renderDetailView() string {
 		statusColor = styles.ColorWarning
 	}
 
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🌍 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Instance: %s", i.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+		i.Name,
 	)
 
 	capacity := fmt.Sprintf("%d Nodes", i.NodeCount)
@@ -50,16 +58,15 @@ func (s *Service) renderDetailView() string {
 		capacity = fmt.Sprintf("%d Processing Units", i.ProcessingUnits)
 	}
 
-	details := fmt.Sprintf(
-		"Display Name: %s\nConfiguration: %s\nCapacity: %s\nState: %s",
-		i.DisplayName,
-		i.Config,
-		capacity,
-		i.State,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Instance Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: i.Name},
+			{Key: "Status", Value: styles.BaseStyle.Foreground(statusColor).Render(i.State)},
+			{Key: "Display Name", Value: i.DisplayName},
+			{Key: "Configuration", Value: i.Config},
+			{Key: "Capacity", Value: capacity},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

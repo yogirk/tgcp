@@ -23,6 +23,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Jobs",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -44,22 +50,23 @@ func (s *Service) renderDetailView() string {
 		statusColor = styles.ColorError
 	}
 
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🌊 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Job: %s", j.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Jobs",
+		j.Name,
 	)
 
-	details := fmt.Sprintf(
-		"ID: %s\nType: %s\nState: %s\nLocation: %s\nCreated: %s",
-		j.ID,
-		strings.Replace(j.Type, "JOB_TYPE_", "", 1),
-		cleanState,
-		j.Location,
-		j.CreateTime, // ISO string
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Job Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: j.Name},
+			{Key: "ID", Value: j.ID},
+			{Key: "Type", Value: strings.Replace(j.Type, "JOB_TYPE_", "", 1)},
+			{Key: "State", Value: styles.BaseStyle.Foreground(statusColor).Render(cleanState)},
+			{Key: "Location", Value: j.Location},
+			{Key: "Created", Value: j.CreateTime},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

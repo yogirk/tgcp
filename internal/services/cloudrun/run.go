@@ -355,6 +355,7 @@ func (s *Service) renderWithTabs() string {
 	// Tabs
 	var tabs string
 	var tableView string
+	listLabel := "Services"
 
 	// Filter Bar
 	var filterBar string
@@ -367,6 +368,7 @@ func (s *Service) renderWithTabs() string {
 		)
 		tableView = s.table.View()
 	} else {
+		listLabel = "Functions"
 		tabs = lipgloss.JoinHorizontal(lipgloss.Top,
 			styles.InactiveTabStyle.Render(" Services "),
 			styles.ActiveTabStyle.Render(" Functions "),
@@ -374,7 +376,13 @@ func (s *Service) renderWithTabs() string {
 		tableView = s.funcTable.View()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, tabs, filterBar, tableView)
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		listLabel,
+	)
+
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, tabs, filterBar, tableView)
 }
 
 func (s *Service) renderDetailView() string {
@@ -390,7 +398,12 @@ func (s *Service) renderDetailView() string {
 
 	// Title
 	// Title
-	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Run > Services > %s", svc.Name))
+	title := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Services",
+		svc.Name,
+	)
 
 	// Status
 	statusStyle := styles.SuccessStyle
@@ -399,26 +412,23 @@ func (s *Service) renderDetailView() string {
 	}
 	status := statusStyle.Render("● " + string(svc.Status))
 
-	// Details
-	details := fmt.Sprintf(`
-%s %s
-%s %s
-%s %s
-`,
-		styles.LabelStyle.Render("Region:"), styles.ValueStyle.Render(svc.Region),
-		styles.LabelStyle.Render("Status:"), status,
-		styles.LabelStyle.Render("URL:"), styles.ValueStyle.Render(svc.URL),
-	)
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Service Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: svc.Name},
+			{Key: "Region", Value: svc.Region},
+			{Key: "Status", Value: status},
+			{Key: "URL", Value: svc.URL},
+		},
+		FooterHint: "Press 'q' or 'esc' to return",
+	})
 
-	// Wrap in a box
-	content := lipgloss.JoinVertical(lipgloss.Left,
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
 		title,
-		details,
 		"",
-		styles.SubtleStyle.Render("Press 'q' or 'esc' to return"),
+		card,
 	)
-
-	return styles.FocusedBoxStyle.Render(content)
 }
 
 func (s *Service) renderFuncDetailView() string {
@@ -426,21 +436,30 @@ func (s *Service) renderFuncDetailView() string {
 		return "No function selected"
 	}
 	f := s.selectedFunc
-	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Run > Functions > %s", f.Name))
-
-	details := fmt.Sprintf(`
-%s %s
-%s %s
-%s %s
-`,
-		styles.LabelStyle.Render("Region:"), styles.ValueStyle.Render(f.Region),
-		styles.LabelStyle.Render("State:"), styles.ValueStyle.Render(f.State),
-		styles.LabelStyle.Render("URL:"), styles.ValueStyle.Render(f.URL),
+	title := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Functions",
+		f.Name,
 	)
 
-	return styles.FocusedBoxStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
-		title, details, "", styles.SubtleStyle.Render("Press 'q' or 'esc' to return"),
-	))
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Function Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: f.Name},
+			{Key: "Region", Value: f.Region},
+			{Key: "State", Value: f.State},
+			{Key: "URL", Value: f.URL},
+		},
+		FooterHint: "Press 'q' or 'esc' to return",
+	})
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		"",
+		card,
+	)
 }
 
 // -----------------------------------------------------------------------------

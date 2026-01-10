@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
 	"github.com/yogirk/tgcp/internal/ui/components"
-	"github.com/yogirk/tgcp/internal/styles"
 )
 
 const CacheTTL = 5 * time.Minute
@@ -285,12 +284,31 @@ func (s *Service) View() string {
 	}
 
 	if s.viewState == ViewDatasets {
-		return s.datasetTable.View()
+		breadcrumb := components.Breadcrumb(
+			fmt.Sprintf("Project %s", s.projectID),
+			s.Name(),
+			"Datasets",
+		)
+		return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, s.datasetTable.View())
 	} else if s.viewState == ViewTables {
-		header := styles.SubtleStyle.Render(fmt.Sprintf("BigQuery > Datasets > %s", s.selectedDataset.ID))
+		header := components.Breadcrumb(
+			fmt.Sprintf("Project %s", s.projectID),
+			s.Name(),
+			"Datasets",
+			s.selectedDataset.ID,
+			"Tables",
+		)
 		return lipgloss.JoinVertical(lipgloss.Left, header, s.tableTable.View())
 	} else if s.viewState == ViewSchema {
-		header := styles.SubtleStyle.Render(fmt.Sprintf("BigQuery > Datasets > %s > Tables > %s", s.selectedDataset.ID, s.selectedTable.ID))
+		header := components.Breadcrumb(
+			fmt.Sprintf("Project %s", s.projectID),
+			s.Name(),
+			"Datasets",
+			s.selectedDataset.ID,
+			"Tables",
+			s.selectedTable.ID,
+			"Schema",
+		)
 		return lipgloss.JoinVertical(lipgloss.Left, header, s.schemaTable.View())
 	}
 	return ""

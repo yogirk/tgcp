@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 5 * time.Minute
@@ -287,7 +287,12 @@ func (s *Service) View() string {
 	}
 
 	if s.viewState == ViewList {
-		return s.networksTable.View()
+		breadcrumb := components.Breadcrumb(
+			fmt.Sprintf("Project %s", s.projectID),
+			s.Name(),
+			"Networks",
+		)
+		return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, s.networksTable.View())
 	} else if s.viewState == ViewDetail {
 		return s.renderDetailView()
 	}
@@ -295,7 +300,12 @@ func (s *Service) View() string {
 }
 
 func (s *Service) renderDetailView() string {
-	header := styles.SubtleStyle.Render(fmt.Sprintf("Networking > VPCs > %s", s.selectedNetwork.Name))
+	header := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Networks",
+		s.selectedNetwork.Name,
+	)
 
 	// Tabs
 	var subStyle, fwStyle lipgloss.Style

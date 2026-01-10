@@ -280,6 +280,12 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Disks",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())

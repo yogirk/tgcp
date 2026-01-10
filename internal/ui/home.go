@@ -38,7 +38,7 @@ func (m MainModel) View() string {
 	if m.Navigation.PaletteActive {
 		// Overlay Palette on top of the entire screen
 		// Note: Palette.Render uses lipgloss.Place to center itself in the given dimensions
-		paletteView := m.Palette.Render(m.Navigation, m.Height, GetBanner())
+		paletteView := m.Palette.Render(m.Navigation, m.Width, m.Height, GetBanner())
 
 		// To truly "overlay" in TUI without clearing background is hard with just string concatenation.
 		// However, lipgloss.Place will fill the screen with whitespace if we aren't careful.

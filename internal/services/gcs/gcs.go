@@ -351,6 +351,12 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Buckets",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -358,7 +364,17 @@ func (s *Service) renderListView() string {
 }
 
 func (s *Service) renderObjectListView() string {
-	header := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s > %s", s.selectedBucket.Name, s.currentPrefix))
+	prefix := s.currentPrefix
+	if prefix == "" {
+		prefix = "/"
+	}
+	header := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Buckets",
+		s.selectedBucket.Name,
+		prefix,
+	)
 	return lipgloss.JoinVertical(lipgloss.Left, header, s.filter.View(), s.objectTable.View())
 }
 
@@ -369,33 +385,22 @@ func (s *Service) renderDetailView() string {
 
 	b := s.selectedBucket
 
-	title := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s", b.Name))
-
-	// Details
-	content := fmt.Sprintf(`
-Name:      %s
-Location:  %s
-Class:     %s
-Created:   %s
-`,
+	title := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Buckets",
 		b.Name,
-		b.Location,
-		b.StorageClass,
-		b.Created.Format(time.RFC822),
 	)
 
-	// Wrap in a box
-	box := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorSecondary).
-		Padding(1).
-		Width(80).
-		Render(content)
-
-	view := lipgloss.JoinVertical(lipgloss.Top,
-		styles.LabelStyle.Render("╭─ Bucket Details ─────────────────────────────────────────────╮"),
-		box,
-	)
+	view := components.DetailCard(components.DetailCardOpts{
+		Title: "Bucket Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: b.Name},
+			{Key: "Location", Value: b.Location},
+			{Key: "Class", Value: b.StorageClass},
+			{Key: "Created", Value: b.Created.Format(time.RFC822)},
+		},
+	})
 
 	// Action Bar
 	actions := styles.HelpStyle.Render("Enter Browse Objects | q Back")

@@ -23,6 +23,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -40,25 +46,27 @@ func (s *Service) renderDetailView() string {
 		statusColor = styles.ColorWarning
 	}
 
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🧠 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Instance: %s", i.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+		i.Name,
 	)
 
-	details := fmt.Sprintf(
-		"Display Name: %s\nLocation: %s\nTier: %s\nCapacity: %d GB\nVersion: %s\n\nHost: %s\nPort: %d\nNetwork: %s",
-		i.DisplayName,
-		i.Location,
-		i.Tier,
-		i.MemorySizeGb,
-		i.RedisVersion,
-		i.Host,
-		i.Port,
-		i.AuthorizedNetwork,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Instance Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: i.Name},
+			{Key: "Status", Value: styles.BaseStyle.Foreground(statusColor).Render(i.State)},
+			{Key: "Display Name", Value: i.DisplayName},
+			{Key: "Location", Value: i.Location},
+			{Key: "Tier", Value: i.Tier},
+			{Key: "Capacity", Value: fmt.Sprintf("%d GB", i.MemorySizeGb)},
+			{Key: "Version", Value: i.RedisVersion},
+			{Key: "Host", Value: i.Host},
+			{Key: "Port", Value: fmt.Sprintf("%d", i.Port)},
+			{Key: "Network", Value: i.AuthorizedNetwork},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

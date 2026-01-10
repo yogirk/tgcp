@@ -284,7 +284,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, nil
 }
 
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------- 
 // View Rendering
 // -----------------------------------------------------------------------------
 
@@ -310,7 +310,13 @@ func (s *Service) View() string {
 }
 
 func (s *Service) renderListView() string {
-	return lipgloss.JoinVertical(lipgloss.Left, s.filter.View(), s.table.View())
+	// Follow docs/ui_patterns.md for detail layout decisions.
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Items",
+	)
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, s.filter.View(), s.table.View())
 }
 
 // -----------------------------------------------------------------------------
@@ -381,6 +387,13 @@ func (s *Service) renderDetailView() string {
 		return "Error: No item selected"
 	}
 
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Items",
+		s.selectedItem.Name,
+	)
+
 	// Use lipgloss for styling
 	title := styles.TitleStyle.Render(s.selectedItem.Name)
 
@@ -391,11 +404,13 @@ func (s *Service) renderDetailView() string {
 	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
 
 	// Wrap in a styled box
-	return styles.BoxStyle.Copy().
+	box := styles.BoxStyle.Copy().
 		Border(lipgloss.RoundedBorder()).
 		Padding(1, 2).
 		Width(60).
 		Render(content.String())
+
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", box)
 }
 
 // performActionCmd is an example of how to implement action commands

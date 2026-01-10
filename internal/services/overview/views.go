@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 // Styles specific to billing dashboard
@@ -37,6 +37,11 @@ func (s *Service) View() string {
 	if s.data.Error != nil {
 		return components.RenderError(s.data.Error, "Overview", "Project Overview")
 	}
+
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+	)
 
 	// 1. Header Section (Status + Account)
 	statusIcon := "🟢"
@@ -235,6 +240,8 @@ func (s *Service) View() string {
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
+		breadcrumb,
+		"",
 		header,
 		savingsSection,
 		inventorySection,

@@ -3,54 +3,62 @@ package styles
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// Colors
-	ColorPrimary   = lipgloss.Color("205") // Pink
-	ColorSecondary = lipgloss.Color("62")  // Purple
-	ColorText      = lipgloss.Color("252") // White-ish
-	ColorSubtext   = lipgloss.Color("240") // Grey
-	ColorSuccess   = lipgloss.Color("42")  // Green
-	ColorWarning   = lipgloss.Color("214") // Orange
-	ColorError     = lipgloss.Color("196") // Red
-	ColorHighlight = lipgloss.Color("212") // Light Pink
-	ColorAccent    = lipgloss.Color("39")  // Cyan/Blue for GKE headers
+	// Semantic colors
+	ColorBrandPrimary = lipgloss.Color("33")  // GCP Blue
+	ColorBrandAccent  = lipgloss.Color("39")  // Light Blue
+	ColorTextPrimary  = lipgloss.Color("252") // Near white
+	ColorTextMuted    = lipgloss.Color("245") // Muted grey
+	ColorBorderSubtle = lipgloss.Color("238") // Subtle border
+	ColorSuccess      = lipgloss.Color("42")  // Green
+	ColorWarning      = lipgloss.Color("214") // Orange
+	ColorError        = lipgloss.Color("196") // Red
+	ColorInfo         = lipgloss.Color("45")  // Cyan
+
+	// Legacy aliases (keep for compatibility; prefer semantic names above)
+	ColorPrimary   = ColorBrandPrimary
+	ColorSecondary = ColorBorderSubtle
+	ColorText      = ColorTextPrimary
+	ColorSubtext   = ColorTextMuted
+	ColorHighlight = ColorBrandAccent
+	ColorAccent    = ColorBrandAccent
 
 	// Base Styles
 	BaseStyle = lipgloss.NewStyle().
-			Foreground(ColorText)
+			Foreground(ColorTextPrimary)
 
 	// Component Styles
 	BoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorSecondary).
+			BorderForeground(ColorBorderSubtle).
 			Padding(0, 1)
 
 	FocusedBoxStyle = BoxStyle.Copy().
-			BorderForeground(ColorPrimary)
+			BorderForeground(ColorBrandPrimary)
 
 	HeaderStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtext).
+			Foreground(ColorTextMuted).
 			Padding(0, 1)
 
 	TitleStyle = lipgloss.NewStyle().
-			Foreground(ColorPrimary).
+			Foreground(ColorBrandPrimary).
 			Bold(true)
 
 	// Sidebar Styles
 	SidebarStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder(), false, true, false, false). // Right border only
-			BorderForeground(ColorSubtext).
+			BorderForeground(ColorBorderSubtle).
 			Padding(0, 1).
 			Width(25) // Fixed width for sidebar
 
 	SelectedItemStyle = lipgloss.NewStyle().
-				Foreground(ColorPrimary).
+				Foreground(ColorBrandAccent).
 				Bold(true).
 				Border(lipgloss.NormalBorder(), false, false, false, true). // Left border
-				BorderForeground(ColorPrimary).
+				BorderForeground(ColorBrandAccent).
 				Padding(0, 0, 0, 1)
 
 	UnselectedItemStyle = lipgloss.NewStyle().
-				Foreground(ColorText).
+				Foreground(ColorTextPrimary).
 				Padding(0, 0, 0, 2)
 
 	// Status Bar Styles
@@ -61,12 +69,12 @@ var (
 
 	// Generic Styles
 	LabelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("99")).
+			Foreground(ColorTextMuted).
 			Bold(true).
 			Width(10)
 
 	ValueStyle = lipgloss.NewStyle().
-			Foreground(ColorText)
+			Foreground(ColorTextPrimary)
 
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(ColorError).
@@ -74,7 +82,7 @@ var (
 
 	// New Styles
 	SubtleStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtext)
+			Foreground(ColorTextMuted)
 
 	SubtextStyle = SubtleStyle // Alias for SubtextStyle used in views
 
@@ -85,20 +93,20 @@ var (
 			Foreground(ColorWarning)
 
 	HelpStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtext).
+			Foreground(ColorTextMuted).
 			Italic(true)
 
 	// Tab Styles
 	ActiveTabStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder(), true, true, false, true).
-			BorderForeground(ColorPrimary).
+			BorderForeground(ColorBrandAccent).
 			Padding(0, 1).
 			Bold(true).
-			Foreground(ColorPrimary)
+			Foreground(ColorBrandAccent)
 
 	InactiveTabStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder(), true, true, false, true).
-				BorderForeground(ColorSubtext).
+				BorderForeground(ColorBorderSubtle).
 				Padding(0, 1).
-				Foreground(ColorSubtext)
+				Foreground(ColorTextMuted)
 )

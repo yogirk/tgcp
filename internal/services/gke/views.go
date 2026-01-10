@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) renderDetailView() string {
@@ -14,26 +14,25 @@ func (s *Service) renderDetailView() string {
 	}
 	c := s.selectedCluster
 
-	// 1. Header Box
-	headerTitle := fmt.Sprintf("📦 Cluster: %s (%s)", c.Name, c.Status)
-	headerContent := fmt.Sprintf(
-		"Current Master: %s\nEndpoint: %s\nMode: %s\nNetwork: %s / %s",
-		c.MasterVersion,
-		c.Endpoint,
-		c.Mode,
-		c.Network,
-		c.Subnetwork,
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Clusters",
+		c.Name,
 	)
 
-	headerBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorAccent).
-		Width(80).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				styles.HeaderStyle.Render(headerTitle),
-				headerContent,
-			),
-		)
+	headerBox := components.DetailCard(components.DetailCardOpts{
+		Title: "Cluster Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: c.Name},
+			{Key: "Status", Value: c.Status},
+			{Key: "Master", Value: c.MasterVersion},
+			{Key: "Endpoint", Value: c.Endpoint},
+			{Key: "Mode", Value: c.Mode},
+			{Key: "Network", Value: c.Network},
+			{Key: "Subnetwork", Value: c.Subnetwork},
+		},
+	})
 
 	// 2. Node Pools Box
 	var poolLines []string
@@ -66,20 +65,14 @@ func (s *Service) renderDetailView() string {
 	}
 
 	poolsContent := lipgloss.JoinVertical(lipgloss.Left, poolLines...)
-	poolsBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorSubtext).
-		Width(80).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				styles.HeaderStyle.Render("🖥️ Node Pools (Infrastructure Cost)"),
-				poolsContent,
-			),
-		)
+	poolsBox := components.DetailSection("Node Pools (Infrastructure Cost)", poolsContent, styles.ColorBorderSubtle)
 
 	// 3. Command Hint
 	cmdHint := styles.SubtextStyle.Render("Press 'K' to launch k9s for this cluster")
 
 	return lipgloss.JoinVertical(lipgloss.Left,
+		breadcrumb,
+		"",
 		headerBox,
 		"",
 		poolsBox,
@@ -92,7 +85,7 @@ func (s *Service) renderConfirmation() string {
 	if s.selectedCluster == nil {
 		return "Error: No cluster selected"
 	}
-	
+
 	// GKE doesn't have start/stop actions, but confirmation is ready for future use
 	// For now, use a generic confirmation
 	if s.pendingAction == "" {
