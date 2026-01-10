@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 30 * time.Second
@@ -62,7 +62,9 @@ type Service struct {
 	activeTab Tab
 
 	// UI Components
-	filter components.FilterModel
+	filter                components.FilterModel
+	serviceFilterSession  components.FilterSession[RunService]
+	functionFilterSession components.FilterSession[Function]
 
 	// State
 	services  []RunService
@@ -99,14 +101,17 @@ func NewService(cache *core.Cache) *Service {
 	}
 	ft := components.NewStandardTable(funcColumns)
 
-	return &Service{
+	svc := &Service{
 		table:     t,
 		funcTable: ft,
 		activeTab: TabServices,
-		filter:     components.NewFilterWithPlaceholder("Filter services..."),
+		filter:    components.NewFilterWithPlaceholder("Filter services..."),
 		viewState: ViewList,
 		cache:     cache,
 	}
+	svc.serviceFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredServices, svc.updateTable)
+	svc.functionFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredFunctions, svc.updateFuncTable)
+	return svc
 }
 
 // Name returns the full human-readable name
@@ -224,13 +229,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case servicesMsg:
 		s.loading = false
 		s.services = msg
-		s.updateTable(s.services)
+		s.serviceFilterSession.Apply(s.services)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case functionsMsg:
 		s.loading = false
 		s.functions = msg
-		s.updateFuncTable(s.functions)
+		s.functionFilterSession.Apply(s.functions)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	// 3. Error Handling
@@ -249,25 +254,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if s.viewState == ViewList {
 			var result components.FilterUpdateResult
 			if s.activeTab == TabServices {
-				result = components.HandleFilterUpdate(
-					&s.filter,
-					msg,
-					s.services,
-					func(items []RunService, query string) []RunService {
-						return s.getFilteredServices(items, query)
-					},
-					s.updateTable,
-				)
+				result = s.serviceFilterSession.HandleKey(msg)
 			} else {
-				result = components.HandleFilterUpdate(
-					&s.filter,
-					msg,
-					s.functions,
-					func(items []Function, query string) []Function {
-						return s.getFilteredFunctions(items, query)
-					},
-					s.updateFuncTable,
-				)
+				result = s.functionFilterSession.HandleKey(msg)
 			}
 
 			if result.Handled {
@@ -291,6 +280,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, s.fetchFunctionsCmd(true)
 				} else {
 					s.activeTab = TabServices
+					s.serviceFilterSession.Apply(s.services)
 					return s, nil
 				}
 			case "r":
@@ -365,13 +355,11 @@ func (s *Service) renderWithTabs() string {
 	// Tabs
 	var tabs string
 	var tableView string
-	
+
 	// Filter Bar
 	var filterBar string
-	if s.filter.IsActive() || s.filter.Value() != "" {
-		filterBar = s.filter.View() + "\n"
-	}
-	
+	filterBar = s.filter.View() + "\n"
+
 	if s.activeTab == TabServices {
 		tabs = lipgloss.JoinHorizontal(lipgloss.Top,
 			styles.ActiveTabStyle.Render(" Services "),
@@ -385,7 +373,7 @@ func (s *Service) renderWithTabs() string {
 		)
 		tableView = s.funcTable.View()
 	}
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, tabs, filterBar, tableView)
 }
 

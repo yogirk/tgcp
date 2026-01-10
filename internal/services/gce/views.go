@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 // renderDetailView renders the details of a single instance
@@ -117,10 +117,8 @@ func (s *Service) renderListView() string {
 	doc := strings.Builder{}
 
 	// Filter Bar
-	if s.filter.IsActive() || s.filter.Value() != "" {
-		doc.WriteString(s.filter.View())
-		doc.WriteString("\n")
-	}
+	doc.WriteString(s.filter.View())
+	doc.WriteString("\n")
 
 	doc.WriteString(styles.BaseStyle.Render(s.table.View()))
 	return doc.String()

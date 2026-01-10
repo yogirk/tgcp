@@ -1,11 +1,13 @@
 package components
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/yogirk/tgcp/internal/styles"
 )
 
 // FilterModel provides a reusable filter input component with consistent behavior
@@ -14,6 +16,8 @@ import (
 type FilterModel struct {
 	TextInput textinput.Model
 	Active    bool
+	Matches   int
+	Total     int
 }
 
 // NewFilter creates a new FilterModel with default settings
@@ -54,24 +58,40 @@ func (m FilterModel) Update(msg tea.Msg) (FilterModel, tea.Cmd) {
 
 // View renders the filter input when active
 func (m FilterModel) View() string {
-	if !m.Active {
-		return ""
+	label := styles.SubtleStyle.Render("Filter:")
+
+	query := m.TextInput.Value()
+	queryView := m.TextInput.View()
+	if query == "" && !m.Active {
+		queryView = styles.SubtleStyle.Render("/ to filter")
 	}
 
-	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("214")). // Orange
-		Padding(0, 1)
+	var countText string
+	if query == "" {
+		countText = fmt.Sprintf("Items: %d", m.Total)
+	} else {
+		countText = fmt.Sprintf("Matches: %d/%d", m.Matches, m.Total)
+	}
+	countView := styles.SubtleStyle.Render(countText)
 
-	filterInput := style.Render(m.TextInput.View())
-	
-	// Add help text below the filter
-	helpText := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Italic(true).
-		Render("Press Esc to exit filter, Enter to keep filter value")
-	
-	return lipgloss.JoinVertical(lipgloss.Left, filterInput, helpText)
+	clearHint := ""
+	if query != "" {
+		clearHint = styles.SubtleStyle.Render("Esc:Clear")
+	}
+
+	bar := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		label,
+		" ",
+		queryView,
+		"  ",
+		countView,
+	)
+	if clearHint != "" {
+		bar = lipgloss.JoinHorizontal(lipgloss.Left, bar, "  ", clearHint)
+	}
+
+	return bar
 }
 
 // EnterFilterMode activates the filter and focuses the input
@@ -103,6 +123,10 @@ func (m *FilterModel) HandleKeyMsg(msg tea.KeyMsg) (shouldExit bool, shouldKeepV
 		if msg.String() == "/" {
 			cmd = m.EnterFilterMode()
 			return false, false, cmd
+		}
+		if msg.String() == "esc" && m.TextInput.Value() != "" {
+			m.TextInput.Reset()
+			return true, false, nil
 		}
 		return false, false, nil
 	}
@@ -137,6 +161,12 @@ func (m FilterModel) Value() string {
 // IsActive returns whether the filter is currently active
 func (m FilterModel) IsActive() bool {
 	return m.Active
+}
+
+// SetMatchCounts updates the total and matched counts for the filter bar.
+func (m *FilterModel) SetMatchCounts(total, matches int) {
+	m.Total = total
+	m.Matches = matches
 }
 
 // FilterSlice is a generic helper function that filters a slice of items based on
@@ -196,12 +226,13 @@ func HandleFilterUpdate[T any](
 	updateTable func([]T),
 ) FilterUpdateResult {
 	key := msg.String()
-	
+
 	// If filter is active and this is a navigation key, let it pass through to table
 	if filter.IsActive() && IsNavigationKey(key) {
 		// Apply current filter to table (in case filter value changed)
 		filteredItems := getFiltered(allItems, filter.Value())
 		updateTable(filteredItems)
+		filter.SetMatchCounts(len(allItems), len(filteredItems))
 		return FilterUpdateResult{
 			Handled:        false,
 			ShouldContinue: true,
@@ -229,11 +260,17 @@ func HandleFilterUpdate[T any](
 		if !shouldKeepValue {
 			// Reset table when clearing filter
 			updateTable(allItems)
+			filter.SetMatchCounts(len(allItems), len(allItems))
 		}
-		// Continue processing other keys after exit
+		if shouldKeepValue {
+			filteredItems := getFiltered(allItems, filter.Value())
+			updateTable(filteredItems)
+			filter.SetMatchCounts(len(allItems), len(filteredItems))
+		}
+		// Consume the exit key to avoid triggering other actions.
 		return FilterUpdateResult{
 			Handled:        true,
-			ShouldContinue: true,
+			ShouldContinue: false,
 			Cmd:            nil,
 		}
 	}
@@ -243,6 +280,7 @@ func HandleFilterUpdate[T any](
 		// Now apply the filter to the table immediately
 		filteredItems := getFiltered(allItems, filter.Value())
 		updateTable(filteredItems)
+		filter.SetMatchCounts(len(allItems), len(filteredItems))
 		// Return the command from HandleKeyMsg (inputCmd for blinking cursor)
 		return FilterUpdateResult{
 			Handled:        true,

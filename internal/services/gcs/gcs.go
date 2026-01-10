@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 5 * time.Minute // Buckets don't change often
@@ -53,7 +53,9 @@ type Service struct {
 	objectTable *components.StandardTable
 
 	// UI Components
-	filter components.FilterModel
+	filter              components.FilterModel
+	bucketFilterSession components.FilterSession[Bucket]
+	objectFilterSession components.FilterSession[Object]
 
 	// State
 	buckets []Bucket
@@ -92,13 +94,16 @@ func NewService(cache *core.Cache) *Service {
 	}
 	ot := components.NewStandardTable(objColumns)
 
-	return &Service{
+	svc := &Service{
 		table:       t,
 		objectTable: ot,
-		filter:       components.NewFilterWithPlaceholder("Filter buckets..."),
+		filter:      components.NewFilterWithPlaceholder("Filter buckets..."),
 		viewState:   ViewList,
 		cache:       cache,
 	}
+	svc.bucketFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredBuckets, svc.updateTable)
+	svc.objectFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredObjects, svc.updateObjectTable)
+	return svc
 }
 
 // Name returns the full human-readable name
@@ -208,13 +213,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case bucketsMsg:
 		s.loading = false
 		s.buckets = msg
-		s.updateTable(s.buckets)
+		s.bucketFilterSession.Apply(s.buckets)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case objectsMsg:
 		s.loading = false
 		s.objects = msg
-		s.updateObjectTable(s.objects)
+		s.objectFilterSession.Apply(s.objects)
 		s.objectTable.SetCursor(0)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
@@ -230,17 +235,14 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 5. User Input
 	case tea.KeyMsg:
-		// Handle filter mode (only in list view)
-		if s.viewState == ViewList {
-			result := components.HandleFilterUpdate(
-				&s.filter,
-				msg,
-				s.buckets,
-				func(items []Bucket, query string) []Bucket {
-					return s.getFilteredBuckets(items, query)
-				},
-				s.updateTable,
-			)
+		// Handle filter mode (list or object view)
+		if s.viewState == ViewList || s.viewState == ViewObjects {
+			var result components.FilterUpdateResult
+			if s.viewState == ViewList {
+				result = s.bucketFilterSession.HandleKey(msg)
+			} else {
+				result = s.objectFilterSession.HandleKey(msg)
+			}
 
 			if result.Handled {
 				if result.Cmd != nil {
@@ -277,6 +279,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "q", "esc":
 				s.viewState = ViewList
 				s.selectedBucket = nil
+				s.bucketFilterSession.Apply(s.buckets)
 				return s, nil
 			case "enter":
 				// Go to Object Browser
@@ -348,17 +351,15 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	// Filter Bar
 	var content strings.Builder
-	if s.filter.IsActive() || s.filter.Value() != "" {
-		content.WriteString(s.filter.View())
-		content.WriteString("\n")
-	}
+	content.WriteString(s.filter.View())
+	content.WriteString("\n")
 	content.WriteString(s.table.View())
 	return content.String()
 }
 
 func (s *Service) renderObjectListView() string {
 	header := styles.SubtleStyle.Render(fmt.Sprintf("Cloud Storage > %s > %s", s.selectedBucket.Name, s.currentPrefix))
-	return lipgloss.JoinVertical(lipgloss.Left, header, s.objectTable.View())
+	return lipgloss.JoinVertical(lipgloss.Left, header, s.filter.View(), s.objectTable.View())
 }
 
 func (s *Service) renderDetailView() string {
@@ -463,6 +464,15 @@ func (s *Service) getFilteredBuckets(buckets []Bucket, query string) []Bucket {
 	}
 	return components.FilterSlice(buckets, query, func(bucket Bucket, q string) bool {
 		return components.ContainsMatch(bucket.Name, bucket.Location, bucket.StorageClass)(q)
+	})
+}
+
+func (s *Service) getFilteredObjects(objects []Object, query string) []Object {
+	if query == "" {
+		return objects
+	}
+	return components.FilterSlice(objects, query, func(obj Object, q string) bool {
+		return components.ContainsMatch(obj.Name, obj.Type)(q)
 	})
 }
 

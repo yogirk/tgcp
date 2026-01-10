@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) View() string {
@@ -26,10 +26,8 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
-	if s.filter.IsActive() || s.filter.Value() != "" {
-		content.WriteString(s.filter.View())
-		content.WriteString("\n")
-	}
+	content.WriteString(s.filter.View())
+	content.WriteString("\n")
 	content.WriteString(s.table.View())
 	return content.String()
 }

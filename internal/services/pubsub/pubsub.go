@@ -41,7 +41,9 @@ type Service struct {
 	projectID string
 	table     *components.StandardTable
 
-	filter components.FilterModel
+	filter             components.FilterModel
+	topicFilterSession components.FilterSession[Topic]
+	subFilterSession   components.FilterSession[Subscription]
 
 	topics []Topic
 	subs   []Subscription
@@ -65,12 +67,15 @@ func NewService(cache *core.Cache) *Service {
 
 	t := components.NewStandardTable(columns)
 
-	return &Service{
+	svc := &Service{
 		table:     t,
-		filter:     components.NewFilterWithPlaceholder("Filter topics/subscriptions..."),
+		filter:    components.NewFilterWithPlaceholder("Filter topics/subscriptions..."),
 		viewState: ViewListTopics,
 		cache:     cache,
 	}
+	svc.topicFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredTopics, svc.updateTopicTable)
+	svc.subFilterSession = components.NewFilterSession(&svc.filter, svc.getFilteredSubs, svc.updateSubTable)
+	return svc
 }
 
 func (s *Service) Name() string {
@@ -165,7 +170,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.topics = msg
 		if s.viewState == ViewListTopics {
 			s.loading = false
-			s.updateTopicTable(s.topics)
+			s.topicFilterSession.Apply(s.topics)
 		}
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
@@ -173,7 +178,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.subs = msg
 		if s.viewState == ViewListSubs {
 			s.loading = false
-			s.updateSubTable(s.subs)
+			s.subFilterSession.Apply(s.subs)
 		}
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
@@ -189,25 +194,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if s.viewState == ViewListTopics || s.viewState == ViewListSubs {
 			var result components.FilterUpdateResult
 			if s.viewState == ViewListTopics {
-				result = components.HandleFilterUpdate(
-					&s.filter,
-					msg,
-					s.topics,
-					func(items []Topic, query string) []Topic {
-						return s.getFilteredTopics(items, query)
-					},
-					s.updateTopicTable,
-				)
+				result = s.topicFilterSession.HandleKey(msg)
 			} else {
-				result = components.HandleFilterUpdate(
-					&s.filter,
-					msg,
-					s.subs,
-					func(items []Subscription, query string) []Subscription {
-						return s.getFilteredSubs(items, query)
-					},
-					s.updateSubTable,
-				)
+				result = s.subFilterSession.HandleKey(msg)
 			}
 
 			if result.Handled {
@@ -229,7 +218,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "s": // Switch to Subs
 				if s.viewState == ViewListTopics {
 					s.viewState = ViewListSubs
-					s.updateSubTable(s.subs) // Render existing if available
+					s.subFilterSession.Apply(s.subs) // Render existing if available
 					if len(s.subs) == 0 {
 						s.loading = true
 						return s, s.fetchSubsCmd(true)
@@ -238,7 +227,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "t": // Switch to Topics
 				if s.viewState == ViewListSubs {
 					s.viewState = ViewListTopics
-					s.updateTopicTable(s.topics)
+					s.topicFilterSession.Apply(s.topics)
 					if len(s.topics) == 0 {
 						s.loading = true
 						return s, s.fetchTopicsCmd(true)

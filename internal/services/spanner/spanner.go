@@ -38,7 +38,8 @@ type Service struct {
 	projectID string
 	table     *components.StandardTable
 
-	filter components.FilterModel
+	filter        components.FilterModel
+	filterSession components.FilterSession[Instance]
 
 	instances []Instance
 	loading   bool
@@ -60,12 +61,14 @@ func NewService(cache *core.Cache) *Service {
 
 	t := components.NewStandardTable(columns)
 
-	return &Service{
+	svc := &Service{
 		table:     t,
-		filter:     components.NewFilterWithPlaceholder("Filter instances..."),
+		filter:    components.NewFilterWithPlaceholder("Filter instances..."),
 		viewState: ViewList,
 		cache:     cache,
 	}
+	svc.filterSession = components.NewFilterSession(&svc.filter, svc.getFilteredInstances, svc.updateTable)
+	return svc
 }
 
 func (s *Service) Name() string {
@@ -152,7 +155,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case instancesMsg:
 		s.loading = false
 		s.instances = msg
-		s.updateTable(s.instances)
+		s.filterSession.Apply(s.instances)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
@@ -165,15 +168,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Handle filter mode (only in list view)
 		if s.viewState == ViewList {
-			result := components.HandleFilterUpdate(
-				&s.filter,
-				msg,
-				s.instances,
-				func(items []Instance, query string) []Instance {
-					return s.getFilteredInstances(items, query)
-				},
-				s.updateTable,
-			)
+			result := s.filterSession.HandleKey(msg)
 
 			if result.Handled {
 				if result.Cmd != nil {
