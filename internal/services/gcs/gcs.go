@@ -167,7 +167,6 @@ func (s *Service) tick() tea.Cmd {
 func (s *Service) Refresh() tea.Cmd {
 	return tea.Batch(
 		s.spinner.Start(""), // Start animated spinner
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
 		s.fetchBucketsCmd(true),
 	)
 }
@@ -222,26 +221,20 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.buckets = msg
 		s.bucketFilterSession.Apply(s.buckets)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case objectsMsg:
 		s.spinner.Stop()
 		s.objects = msg
 		s.objectFilterSession.Apply(s.objects)
 		s.objectTable.SetCursor(0)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	// 3. Error Handling
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:

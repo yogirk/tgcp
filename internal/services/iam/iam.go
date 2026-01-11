@@ -122,15 +122,12 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.accounts = msg
 		s.updateTable(msg)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)
@@ -216,9 +213,8 @@ func (s *Service) fetchAccountsCmd(force bool) tea.Cmd {
 
 func (s *Service) Refresh() tea.Cmd {
 	return tea.Batch(
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
-		s.fetchAccountsCmd(false),
 		s.spinner.Start(""),
+		s.fetchAccountsCmd(false),
 	)
 }
 

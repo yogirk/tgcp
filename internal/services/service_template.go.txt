@@ -160,7 +160,6 @@ func (s *Service) tick() tea.Cmd {
 func (s *Service) Refresh() tea.Cmd {
 	return tea.Batch(
 		s.spinner.Start(""), // Start animated spinner (empty = use playful messages)
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
 		s.fetchDataCmd(true),
 	)
 }
@@ -211,16 +210,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.items = msg
 		s.filterSession.Apply(s.items)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	// 3. Error Handling
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	case actionResultMsg:
 		if msg.err != nil {

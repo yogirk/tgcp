@@ -151,9 +151,8 @@ func (s *Service) Refresh() tea.Cmd {
 		return nil
 	}
 	return tea.Batch(
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
-		fetchCmd,
 		s.spinner.Start(""),
+		fetchCmd,
 	)
 }
 
@@ -203,33 +202,24 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.datasets = msg
 		s.updateDatasetTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case tablesMsg:
 		s.spinner.Stop()
 		s.tables = msg
 		s.updateTableTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case schemaMsg:
 		s.spinner.Stop()
 		s.schema = msg
 		s.updateSchemaTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.datasetTable.HandleWindowSizeDefault(msg)

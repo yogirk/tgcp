@@ -179,7 +179,6 @@ func (s *Service) Refresh() tea.Cmd {
 	}
 	return tea.Batch(
 		s.spinner.Start(""),
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
 		fetchCmd,
 	)
 }
@@ -241,25 +240,19 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.services = msg
 		s.serviceFilterSession.Apply(s.services)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case functionsMsg:
 		s.spinner.Stop()
 		s.functions = msg
 		s.functionFilterSession.Apply(s.functions)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	// 3. Error Handling
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:

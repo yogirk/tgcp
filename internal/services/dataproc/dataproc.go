@@ -120,9 +120,8 @@ func (s *Service) tick() tea.Cmd {
 
 func (s *Service) Refresh() tea.Cmd {
 	return tea.Batch(
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
-		s.fetchClustersCmd(true),
 		s.spinner.Start(""),
+		s.fetchClustersCmd(true),
 	)
 }
 
@@ -165,15 +164,12 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.clusters = msg
 		s.filterSession.Apply(s.clusters)
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)

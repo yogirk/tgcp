@@ -160,9 +160,8 @@ func (s *Service) Refresh() tea.Cmd {
 		return nil
 	}
 	return tea.Batch(
-		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
-		fetchCmd,
 		s.spinner.Start(""),
+		fetchCmd,
 	)
 }
 
@@ -211,33 +210,24 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.networks = msg
 		s.updateNetworksTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case subnetsMsg:
 		s.spinner.Stop()
 		s.subnets = msg
 		s.updateSubnetsTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case firewallsMsg:
 		s.spinner.Stop()
 		s.firewalls = msg
 		s.updateFirewallsTable()
-		return s, tea.Batch(
-			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
-			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
-		)
+		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
 		s.spinner.Stop()
 		s.err = msg
-		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.networksTable.HandleWindowSizeDefault(msg)
