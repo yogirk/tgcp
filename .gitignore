@@ -27,3 +27,6 @@ tgcp-debug
 debug.log
 .tgcp/
 
+# Internal agent documentation
+.aidocs/
+
