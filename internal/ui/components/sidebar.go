@@ -24,26 +24,43 @@ type SidebarModel struct {
 	Height  int
 }
 
+// groupBreaks defines indices after which a visual gap appears (0-indexed)
+// This creates subtle spacing between service categories
+var groupBreaks = map[int]bool{
+	0:  true, // After Overview
+	4:  true, // After Compute (GCE, GKE, Cloud Run)
+	7:  true, // After Storage (GCS, Disks, Firestore)
+	11: true, // After Databases (Cloud SQL, Spanner, Bigtable, Memorystore)
+	15: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
+	// Security & Networking is last, no break needed
+}
+
 func NewSidebar() SidebarModel {
 	return SidebarModel{
 		Items: []ServiceItem{
+			// Overview (top-level)
 			{Name: "Overview", ShortName: "overview", Icon: "◉", Active: true},
+			// Compute
 			{Name: "Compute Engine", ShortName: "gce", Icon: "⚙"},
-			{Name: "Disks", ShortName: "disks", Icon: "◔"},
 			{Name: "Kubernetes", ShortName: "gke", Icon: "☸"},
-			{Name: "Cloud SQL", ShortName: "sql", Icon: "⛁"},
-			{Name: "IAM", ShortName: "iam", Icon: "⚿"},
 			{Name: "Cloud Run", ShortName: "run", Icon: "▷"},
+			// Storage
 			{Name: "Cloud Storage", ShortName: "gcs", Icon: "▤"},
-			{Name: "BigQuery", ShortName: "bq", Icon: "⊞"},
-			{Name: "Networking", ShortName: "net", Icon: "⇄"},
-			{Name: "Pub/Sub", ShortName: "pubsub", Icon: "⇌"},
-			{Name: "Memorystore", ShortName: "redis", Icon: "◇"},
+			{Name: "Disks", ShortName: "disks", Icon: "◔"},
+			{Name: "Firestore", ShortName: "firestore", Icon: "◲"},
+			// Databases
+			{Name: "Cloud SQL", ShortName: "sql", Icon: "⛁"},
 			{Name: "Spanner", ShortName: "spanner", Icon: "⬡"},
 			{Name: "Bigtable", ShortName: "bigtable", Icon: "▦"},
+			{Name: "Memorystore", ShortName: "redis", Icon: "◇"},
+			// Data & Analytics
+			{Name: "BigQuery", ShortName: "bq", Icon: "⊞"},
 			{Name: "Dataflow", ShortName: "dataflow", Icon: "⇢"},
 			{Name: "Dataproc", ShortName: "dataproc", Icon: "⎈"},
-			{Name: "Firestore", ShortName: "firestore", Icon: "◲"},
+			{Name: "Pub/Sub", ShortName: "pubsub", Icon: "⇌"},
+			// Security & Networking
+			{Name: "IAM", ShortName: "iam", Icon: "⚿"},
+			{Name: "Networking", ShortName: "net", Icon: "⇄"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start
@@ -117,6 +134,11 @@ func (m SidebarModel) View() string {
 
 		doc.WriteString(renderedItem)
 		doc.WriteString("\n")
+
+		// Add subtle spacing after group breaks
+		if groupBreaks[i] {
+			doc.WriteString("\n")
+		}
 	}
 
 	// Fill remaining height with empty space to maintain border

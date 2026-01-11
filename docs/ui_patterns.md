@@ -68,10 +68,23 @@ components.DetailCard(components.DetailCardOpts{
         {Key: "Status", Value: instance.Status}, // Auto-styled as badge
         {Key: "Zone", Value: instance.Zone},
     },
+    FooterHint: "s Start | x Stop | q Back",
 })
 ```
 
+**Visual structure:**
+```
+ Instance Details                    ← Header bar (background + bold)
+╭──────────────────────────────────╮
+│ Name:     my-instance            │ ← Primary box with key-value rows
+│ Status:   ✓ RUNNING              │
+╰──────────────────────────────────╯
+[s] Start  [x] Stop  [q] Back       ← Footer hints (styled keys)
+```
+
+-   **Header Bar**: Title rendered with background (matches table headers).
 -   **Auto-Status Detection**: Fields named "Status" or "State" are automatically rendered as badges.
+-   **Footer Hints**: Use `FooterHint` option for keyboard shortcuts.
 -   **Breadcrumbs**: Use `components.Breadcrumb()` - renders with `›` separator, muted path, bold current location.
 
 ### 4. Status Indicators
@@ -126,6 +139,70 @@ Toast types:
 -   **ToastInfo** (blue): Informational message
 
 Toasts auto-dismiss after 3 seconds (default) or custom duration.
+
+## Landing Page (Home Menu)
+
+The landing page displays a playful ASCII banner, user/project context, and a service menu.
+
+### Current Layout: Collapsible Categories
+
+```
+          ████ TGCP ████
+   User: rk@...    Project: cloudside-academy
+
+┌─ Services ─────────────────────────────┐
+│ ▸ Overview (Command Center)            │  ← Top-level item (always visible)
+│                                        │
+│ ▼ Compute                              │  ← Category headers (collapsible)
+│     Compute Engine (GCE)               │
+│     Kubernetes Engine (GKE)            │
+│     Cloud Run                          │
+│ ▼ Storage                              │
+│     Cloud Storage (GCS)                │
+│     ...                                │
+└────────────────────────────────────────┘
+
+↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette
+```
+
+**Structure:**
+- **Top Item**: Overview sits above categories as the primary dashboard entry point
+- **Categories**: Collapsible groups (Compute, Storage, Databases, Data & Analytics, Security & Networking)
+- **Services**: Indented under their category, shown when expanded
+- **Collapsed state**: Shows count, e.g., `▶ Databases (4)`
+
+**Navigation:**
+- `↑/↓` or `j/k`: Move through visible items
+- `Space` or `Enter` on category: Toggle expand/collapse
+- `Enter` on service: Navigate to that service
+
+### Future: Multi-Column Layout
+
+When service count grows significantly (20+ services, new categories like AI/ML, DevOps), expand horizontally:
+
+```
+┌─ Services ──────────────────────────────────────────────────────────┐
+│ ▸ Overview (Command Center)                                         │
+│                                                                     │
+│ ▼ Compute              ▼ Databases            ▼ AI & ML            │
+│     GCE                    Cloud SQL              Vertex AI        │
+│     GKE                    Spanner                AutoML           │
+│     Cloud Run              Bigtable               Vision API       │
+│                            Memorystore                             │
+│ ▼ Storage              ▼ Data & Analytics     ▼ DevOps            │
+│     GCS                    BigQuery               Cloud Build      │
+│     Disks                  Dataflow               Artifact Reg     │
+│     Firestore              Dataproc               Cloud Deploy     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation considerations:**
+1. **2D Navigation**: `←/→` switches columns, `↑/↓` moves within column
+2. **Responsive columns**: Auto-detect terminal width (1 col < 80, 2 cols < 120, 3 cols 120+)
+3. **Category placement**: Group related categories in the same row for visual coherence
+4. **Independent expansion**: Each column expands independently; others stay put
+
+**Trigger**: Implement when adding next batch of services (AI/ML, DevOps categories).
 
 ## Interaction Patterns
 

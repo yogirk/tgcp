@@ -91,41 +91,8 @@ func renderLandingPage(m MainModel) string {
 	// Menu
 	menu := m.HomeMenu.View()
 
-	// Navigation Hints
-	col1 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Global"),
-		"q      Quit / Back",
-		"?      Toggle Help",
-		":      Cmd Palette",
-		"/      Filter List",
-	)
-
-	col2 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Navigation"),
-		"↑/↓    Move Cursor",
-		"← / →  Focus Panes",
-		"Enter  Select / Detail",
-		"Tab    Toggle Sidebar",
-		"Esc    Go Back",
-	)
-
-	col3 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Actions"),
-		"r      Refresh Data",
-		"s      Start Resource",
-		"x      Stop Resource",
-		"h      SSH Connect",
-	)
-
-	hints := styles.SecondaryBoxStyle.Copy().
-		Padding(1, 2).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top,
-			col1,
-			"    ", // spacer
-			col2,
-			"    ", // spacer
-			col3,
-		))
+	// Minimal navigation hint
+	hints := styles.SubtleStyle.Render("↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette")
 
 	// Layout: Center everything
 	// We use lipgloss.Place to center vertically and horizontally

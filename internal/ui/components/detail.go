@@ -24,7 +24,7 @@ type DetailCardOpts struct {
 	FooterHint  string
 }
 
-// DetailCard renders a standardized ASCII-style detail card.
+// DetailCard renders a standardized detail card with header bar.
 func DetailCard(opts DetailCardOpts) string {
 	width := opts.Width
 	if width <= 0 {
@@ -35,7 +35,11 @@ func DetailCard(opts DetailCardOpts) string {
 		borderColor = styles.ColorBorderSubtle
 	}
 
-	title := styles.LabelStyle.Render(fmt.Sprintf("╭─ %s ─", opts.Title))
+	// Header bar style (matches table headers)
+	title := styles.HeaderStyle.Copy().
+		Width(width).
+		Render(opts.Title)
+
 	body := renderKeyValues(opts.Rows, styles.LabelStyle, styles.ValueStyle)
 
 	box := styles.PrimaryBoxStyle.Copy().

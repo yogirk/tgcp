@@ -141,7 +141,7 @@ SERVICES
 
 ---
 
-### Issue 5: Command Palette Looks Basic
+### Issue 5: Command Palette Looks Basic ✓ DONE
 
 **Current**: Rounded box with simple list
 
@@ -154,10 +154,18 @@ SERVICES
 **Compare to**: VS Code command palette, fzf, telescope.nvim
 
 **Tasks**:
-- `[ ] Connect input box to suggestions seamlessly (no top border on dropdown)`
-- `[ ] Highlight matching characters in suggestions`
-- `[ ] Better placeholder: "Search services, actions..."`
-- `[ ] Consider MRU section when input is empty`
+- `[x] Connect input box to suggestions seamlessly (no top border on dropdown)`
+- `[x] Highlight matching characters in suggestions`
+- `[x] Better placeholder: "Search services, actions..."`
+- `[-] Consider MRU section when input is empty` (deferred - nice-to-have)
+
+**Implementation Notes**:
+- Input box now removes bottom border when dropdown is visible (seamless connection)
+- Both input and dropdown use same accent color border for visual unity
+- Placeholder changed to "Search services, actions..." (more descriptive)
+- Added `SuggestionMatch` struct in `core/navigation.go` to carry fuzzy match indexes
+- Added `highlightMatches()` function in `palette.go` to render matched chars in accent color
+- Matched characters in both name and description are highlighted with bold accent color
 
 ---
 
@@ -370,7 +378,7 @@ With `[s]` styled differently (background or bold).
 
 ---
 
-### 5. Confirmation Dialogs Could Be More Contextual
+### 5. Confirmation Dialogs Could Be More Contextual ✓ DONE
 
 **Current**: Orange border for all confirmations
 
@@ -381,11 +389,19 @@ With `[s]` styled differently (background or bold).
 - Stop: Orange border, info icon
 - Start: Blue/green, minimal warning
 
-**Task**: `[ ] Add action-specific styling to confirmation dialogs`
+**Task**: `[x] Add action-specific styling to confirmation dialogs`
+
+**Implementation Notes**:
+- Added `actionStyle` struct and `getActionStyle()` in `confirmation.go`
+- **Delete/Remove/Destroy**: Red border, ⚠ icon, "This action cannot be undone." impact text
+- **Stop/Terminate/Shutdown**: Orange border, ⏸ icon
+- **Start/Restart/Resume**: Cyan/info border, ▶ icon
+- **Snapshot/Backup**: Accent blue border, 📷 icon
+- **Default**: Orange border, ⚠ icon (backwards compatible)
 
 ---
 
-### 6. Help Overlay is Dense
+### 6. Help Overlay is Dense (DEFERRED - Next Release)
 
 **Current**: Three columns of keybindings
 
@@ -396,7 +412,7 @@ With `[s]` styled differently (background or bold).
 - Compact format: `key → action` aligned
 - Maybe searchable in future
 
-**Task**: `[ ] Reorganize help with context-specific sections first`
+**Task**: `[-] Reorganize help with context-specific sections first` (deferred)
 
 ---
 
@@ -503,11 +519,11 @@ Pulsing indicators for transitioning states (k9s does this subtly).
 | Priority | Task | Impact | Effort |
 |----------|------|--------|--------|
 | P2 | ~~Add toast notifications for actions~~ DONE | High | Medium |
-| P2 | Highlight matching characters in palette | Medium | Medium |
+| P2 | ~~Highlight matching characters in palette~~ DONE | Medium | Medium |
 | P2 | ~~Create border hierarchy (primary/secondary styles)~~ DONE | Medium | Low |
 | P2 | Add alternating row colors to tables | Medium | Medium |
 | P2 | ~~Enhance table headers (background/underline)~~ DONE | Medium | Low |
-| P2 | Action-specific confirmation styling | Medium | Medium |
+| P2 | ~~Action-specific confirmation styling~~ DONE | Medium | Medium |
 | P2 | Compact header for inner screens | Medium | Low |
 
 ### Nice-to-Have (Post-Launch)
@@ -515,7 +531,7 @@ Pulsing indicators for transitioning states (k9s does this subtly).
 | Priority | Task | Impact | Effort |
 |----------|------|--------|--------|
 | P3 | MRU commands in palette | Medium | Medium |
-| P3 | Reorganize help with context sections | Medium | Medium |
+| P3 | Reorganize help with context sections (DEFERRED) | Medium | Medium |
 | P3 | Resource count badges in sidebar | Medium | High |
 | P3 | Split pane mode | High | High |
 | P3 | Syntax highlighting in detail views | Medium | High |

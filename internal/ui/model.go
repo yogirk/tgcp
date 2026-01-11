@@ -382,10 +382,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// HOME MODE
 		if m.ViewMode == ViewHome && !m.ShowHelp && m.Focus != FocusPalette {
 			switch msg.String() {
-			case "enter":
+			case "enter", " ":
+				// If on category header, toggle it
+				if m.HomeMenu.IsOnCategory() {
+					m.HomeMenu.ToggleCurrentCategory()
+					return m, nil
+				}
 				// Select service
 				selected := m.HomeMenu.SelectedItem()
-				if !selected.IsComing { // Only allow entering implemented services
+				if selected.ShortName != "" && !selected.IsComing { // Only allow entering implemented services
 					m.ViewMode = ViewService
 					m.ActiveService = selected.ShortName
 

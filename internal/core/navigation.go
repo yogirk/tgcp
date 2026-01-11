@@ -29,6 +29,12 @@ type Command struct {
 	Action      func() Route
 }
 
+// SuggestionMatch wraps a Command with fuzzy match info for highlighting
+type SuggestionMatch struct {
+	Command
+	MatchedIndexes []int // Positions of matched characters in Name+Description
+}
+
 // NavigationModel manages routing and command palette state
 type NavigationModel struct {
 	CurrentRoute Route
@@ -39,7 +45,7 @@ type NavigationModel struct {
 	// Palette State
 	PaletteActive bool
 	Query         string
-	Suggestions   []Command
+	Suggestions   []SuggestionMatch // Includes match info for highlighting
 	Selection     int
 }
 
@@ -51,7 +57,7 @@ func NewNavigation() NavigationModel {
 		Commands:      defaults,
 		BaseCommands:  defaults,
 		PaletteActive: false,
-		Suggestions:   []Command{},
+		Suggestions:   []SuggestionMatch{},
 	}
 }
 
@@ -106,7 +112,7 @@ func (m *NavigationModel) RestoreBaseCommands() {
 func (m *NavigationModel) FilterCommands(query string) {
 	m.Query = query
 	if query == "" {
-		m.Suggestions = []Command{}
+		m.Suggestions = []SuggestionMatch{}
 		return
 	}
 
@@ -118,9 +124,12 @@ func (m *NavigationModel) FilterCommands(query string) {
 
 	matches := fuzzy.Find(query, sources)
 
-	m.Suggestions = make([]Command, 0, len(matches))
+	m.Suggestions = make([]SuggestionMatch, 0, len(matches))
 	for _, match := range matches {
-		m.Suggestions = append(m.Suggestions, m.Commands[match.Index])
+		m.Suggestions = append(m.Suggestions, SuggestionMatch{
+			Command:        m.Commands[match.Index],
+			MatchedIndexes: match.MatchedIndexes,
+		})
 	}
 	m.Selection = 0 // Reset selection
 }
