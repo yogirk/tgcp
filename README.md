@@ -28,15 +28,45 @@ For the best experience, we recommend using [Google Sans Mono](https://fonts.goo
 
 ### Prerequisites
 
-- Go 1.21 or higher
-- Google Cloud SDK (`gcloud`) installed
+- Google Cloud SDK (`gcloud`) installed and configured
+
+### macOS (Homebrew)
+
+```bash
+brew tap yogirk/tgcp
+brew install tgcp
+```
+
+To upgrade to the latest version:
+```bash
+brew upgrade tgcp
+```
+
+### Linux
+
+Download the latest release for your architecture:
+
+```bash
+# For x86_64 (amd64)
+curl -L https://github.com/yogirk/tgcp/releases/latest/download/tgcp_0.1.0_linux_amd64.tar.gz | tar -xz
+sudo mv tgcp /usr/local/bin/
+
+# For ARM64
+curl -L https://github.com/yogirk/tgcp/releases/latest/download/tgcp_0.1.0_linux_arm64.tar.gz | tar -xz
+sudo mv tgcp /usr/local/bin/
+```
+
+Or download from the [Releases](https://github.com/yogirk/tgcp/releases) page.
 
 ### Build from Source
+
+Requires Go 1.21 or higher.
 
 ```bash
 git clone https://github.com/yogirk/tgcp.git
 cd tgcp
 go build -o tgcp ./cmd/tgcp
+sudo mv tgcp /usr/local/bin/
 ```
 
 ## Setup & Authentication
@@ -57,7 +87,7 @@ TGCP uses **Application Default Credentials (ADC)** to authenticate with Google 
 
 Run the application:
 ```bash
-./tgcp
+tgcp
 ```
 
 ### Configuration
@@ -119,7 +149,7 @@ ui:
 
 ### "No Project ID"
 **Cause**: The ADC credentials didn't contain a quota project, and no project was specified in flags.
-**Fix**: Run `gcloud config set project <PROJECT_ID>` or run tgcp with `./tgcp --project <PROJECT_ID>`.
+**Fix**: Run `gcloud config set project <PROJECT_ID>` or run tgcp with `tgcp --project <PROJECT_ID>`.
 
 ### API Errors (403, etc.)
 **Cause**: Your credentials might not have permissions for the specific service (e.g., Compute Viewer).
