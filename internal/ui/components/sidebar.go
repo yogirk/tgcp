@@ -28,10 +28,10 @@ type SidebarModel struct {
 // This creates subtle spacing between service categories
 var groupBreaks = map[int]bool{
 	0:  true, // After Overview
-	4:  true, // After Compute (GCE, GKE, Cloud Run)
-	7:  true, // After Storage (GCS, Disks, Firestore)
-	11: true, // After Databases (Cloud SQL, Spanner, Bigtable, Memorystore)
-	15: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
+	3:  true, // After Compute (GCE, GKE, Cloud Run)
+	5:  true, // After Storage (GCS, Disks)
+	10: true, // After Databases (Cloud SQL, Spanner, Bigtable, Memorystore, Firestore)
+	14: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
 	// Security & Networking is last, no break needed
 }
 
@@ -47,12 +47,12 @@ func NewSidebar() SidebarModel {
 			// Storage
 			{Name: "Cloud Storage", ShortName: "gcs", Icon: "▤"},
 			{Name: "Disks", ShortName: "disks", Icon: "◔"},
-			{Name: "Firestore", ShortName: "firestore", Icon: "◲"},
 			// Databases
 			{Name: "Cloud SQL", ShortName: "sql", Icon: "⛁"},
 			{Name: "Spanner", ShortName: "spanner", Icon: "⬡"},
 			{Name: "Bigtable", ShortName: "bigtable", Icon: "▦"},
 			{Name: "Memorystore", ShortName: "redis", Icon: "◇"},
+			{Name: "Firestore", ShortName: "firestore", Icon: "◲"},
 			// Data & Analytics
 			{Name: "BigQuery", ShortName: "bq", Icon: "⊞"},
 			{Name: "Dataflow", ShortName: "dataflow", Icon: "⇢"},

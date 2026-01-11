@@ -18,11 +18,16 @@ func (s *Service) View() string {
 		return s.spinner.View()
 	}
 
-	if s.viewState == ViewDetail {
+	switch s.viewState {
+	case ViewDetail:
 		return s.renderDetailView()
+	case ViewNamespaces:
+		return s.renderNamespacesView()
+	case ViewKinds:
+		return s.renderKindsView()
 	}
 
-	// Filter Bar
+	// Default: List view
 	var content strings.Builder
 	content.WriteString(components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
@@ -60,4 +65,39 @@ func (s *Service) renderDetailView() string {
 		},
 	})
 	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
+}
+
+func (s *Service) renderNamespacesView() string {
+	if s.selectedDB == nil {
+		return ""
+	}
+
+	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		s.selectedDB.Name+" (Datastore)",
+		"Namespaces",
+	))
+	content.WriteString("\n\n")
+	content.WriteString(s.nsTable.View())
+	return content.String()
+}
+
+func (s *Service) renderKindsView() string {
+	if s.selectedDB == nil || s.selectedNamespace == nil {
+		return ""
+	}
+
+	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		s.selectedDB.Name+" (Datastore)",
+		s.selectedNamespace.Name,
+		"Kinds",
+	))
+	content.WriteString("\n\n")
+	content.WriteString(s.kindTable.View())
+	return content.String()
 }

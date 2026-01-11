@@ -40,7 +40,6 @@ func NewHomeMenu() HomeMenuModel {
 				Services: []ServiceItem{
 					{Name: "Cloud Storage (GCS)", ShortName: "gcs"},
 					{Name: "Disks (Block Storage)", ShortName: "disks"},
-					{Name: "Firestore", ShortName: "firestore"},
 				},
 			},
 			{
@@ -51,6 +50,7 @@ func NewHomeMenu() HomeMenuModel {
 					{Name: "Spanner", ShortName: "spanner"},
 					{Name: "Bigtable", ShortName: "bigtable"},
 					{Name: "Memorystore (Redis)", ShortName: "redis"},
+					{Name: "Firestore / Datastore", ShortName: "firestore"},
 				},
 			},
 			{
