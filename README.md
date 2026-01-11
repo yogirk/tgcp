@@ -20,10 +20,6 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
     - [Developer Guide](docs/DEVELOPER_GUIDE.md)
     - [UI Patterns](docs/ui_patterns.md)
 
-## Recommended Font
-
-For the best experience, we recommend using [Google Sans Mono](https://fonts.google.com/specimen/Google+Sans+Mono) or a [Nerd Font](https://www.nerdfonts.com/) to ensure all glyphs and borders render correctly.
-
 ## Installation
 
 ### Prerequisites
