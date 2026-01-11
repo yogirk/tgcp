@@ -35,10 +35,10 @@ type Service struct {
 	// UI Components
 	filter        components.FilterModel
 	filterSession components.FilterSession[Instance]
+	spinner       components.SpinnerModel
 
 	// State
 	instances []Instance
-	loading   bool
 	err       error
 
 	// View State
@@ -69,6 +69,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter instances..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -134,30 +135,50 @@ func (s *Service) tick() tea.Cmd {
 // Msg types
 type instancesMsg []Instance
 type errMsg error
-type actionResultMsg struct{ err error }
+type actionResultMsg struct {
+	err error
+	msg string
+}
 
 func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchInstancesCmd(false), s.tick())
 
 	case instancesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.instances = msg
 		s.filterSession.Apply(s.instances)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case actionResultMsg:
 		if msg.err != nil {
 			s.err = msg.err
+			return s, func() tea.Msg {
+				return core.ToastMsg{Message: msg.err.Error(), Type: core.ToastError}
+			}
+		} else if msg.msg != "" {
+			return s, tea.Batch(
+				func() tea.Msg {
+					return core.ToastMsg{Message: msg.msg, Type: core.ToastSuccess}
+				},
+				s.Refresh(),
+			)
 		}
-		// Refresh after action
 		return s, s.Refresh()
 
 	case tea.WindowSizeMsg:
@@ -257,11 +278,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading Cloud SQL instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Instances")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -318,8 +341,11 @@ func (s *Service) fetchInstancesCmd(force bool) tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchInstancesCmd(false)
+	return tea.Batch(
+		s.spinner.Start(""),
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		s.fetchInstancesCmd(false),
+	)
 }
 
 func (s *Service) Reset() {
@@ -377,13 +403,19 @@ func (s *Service) getFilteredInstances(instances []Instance, query string) []Ins
 func (s *Service) startInstanceCmd(i Instance) tea.Cmd {
 	return func() tea.Msg {
 		err := s.client.StartInstance(s.projectID, i.Name)
-		return actionResultMsg{err}
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		return actionResultMsg{msg: fmt.Sprintf("Starting instance %s...", i.Name)}
 	}
 }
 
 func (s *Service) stopInstanceCmd(i Instance) tea.Cmd {
 	return func() tea.Msg {
 		err := s.client.StopInstance(s.projectID, i.Name)
-		return actionResultMsg{err}
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		return actionResultMsg{msg: fmt.Sprintf("Stopping instance %s...", i.Name)}
 	}
 }

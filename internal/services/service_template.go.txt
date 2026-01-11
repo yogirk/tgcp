@@ -57,11 +57,11 @@ type Service struct {
 	// UI Components
 	filter        components.FilterModel
 	filterSession components.FilterSession[ExampleItem]
+	spinner       components.SpinnerModel
 
 	// State
-	items   []ExampleItem
-	loading bool
-	err     error
+	items []ExampleItem
+	err   error
 
 	// View State
 	viewState    ViewState
@@ -92,6 +92,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter items..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -157,8 +158,11 @@ func (s *Service) tick() tea.Cmd {
 
 // Refresh triggers a forced data reload
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchDataCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""), // Start animated spinner (empty = use playful messages)
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		s.fetchDataCmd(true),
+	)
 }
 
 // Reset clears the service state when navigating away or switching projects
@@ -193,21 +197,30 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	// Spinner Animation - must be first to ensure smooth animation
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	// 1. Background Tick
 	case tickMsg:
 		return s, tea.Batch(s.fetchDataCmd(false), s.tick())
 
 	// 2. Data Loaded
 	case dataMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.items = msg
 		s.filterSession.Apply(s.items)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	// 3. Error Handling
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case actionResultMsg:
 		if msg.err != nil {
@@ -292,11 +305,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading && len(s.items) == 0 {
-		return components.RenderSpinner("Loading...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Items")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {

@@ -9,11 +9,13 @@ import (
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.instances) == 0 {
-		return components.RenderSpinner("Loading Redis Instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Redis", "Instances")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {

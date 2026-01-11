@@ -54,7 +54,7 @@ type Service struct {
 	datasets []Dataset
 	tables   []Table
 	schema   []SchemaField
-	loading  bool
+	spinner  components.SpinnerModel
 	err      error
 
 	viewState       ViewState
@@ -94,6 +94,7 @@ func NewService(cache *core.Cache) *Service {
 		datasetTable: dsTable,
 		tableTable:   tTable,
 		schemaTable:  sTable,
+		spinner:      components.NewSpinner(),
 		viewState:    ViewDatasets,
 		cache:        cache,
 	}
@@ -140,14 +141,20 @@ func (s *Service) Init() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	// Depends on view? Usually refresh current list
+	var fetchCmd tea.Cmd
 	if s.viewState == ViewDatasets {
-		return s.fetchDatasetsCmd()
+		fetchCmd = s.fetchDatasetsCmd()
 	} else if s.viewState == ViewTables && s.selectedDataset != nil {
-		return s.fetchTablesCmd()
+		fetchCmd = s.fetchTablesCmd()
 	}
-	return nil
+	if fetchCmd == nil {
+		return nil
+	}
+	return tea.Batch(
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		fetchCmd,
+		s.spinner.Start(""),
+	)
 }
 
 func (s *Service) Reset() {
@@ -181,6 +188,10 @@ func (s *Service) Blur() {
 func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		// Background refresh? Maybe only if at root.
 		if s.viewState == ViewDatasets {
@@ -189,26 +200,36 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, s.Init()
 
 	case datasetsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.datasets = msg
 		s.updateDatasetTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case tablesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.tables = msg
 		s.updateTableTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case schemaMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.schema = msg
 		s.updateSchemaTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case tea.WindowSizeMsg:
 		s.datasetTable.HandleWindowSizeDefault(msg)
@@ -226,8 +247,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if s.datasetTable.Cursor() >= 0 && s.datasetTable.Cursor() < len(s.datasets) {
 					s.selectedDataset = &s.datasets[s.datasetTable.Cursor()]
 					s.viewState = ViewTables
-					s.loading = true
-					return s, s.fetchTablesCmd()
+					return s, tea.Batch(s.fetchTablesCmd(), s.spinner.Start(""))
 				}
 			}
 			var updatedTable *components.StandardTable
@@ -246,8 +266,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if s.tableTable.Cursor() >= 0 && s.tableTable.Cursor() < len(s.tables) {
 					s.selectedTable = &s.tables[s.tableTable.Cursor()]
 					s.viewState = ViewSchema
-					s.loading = true
-					return s, s.fetchSchemaCmd()
+					return s, tea.Batch(s.fetchSchemaCmd(), s.spinner.Start(""))
 				}
 			}
 			var updatedTable *components.StandardTable
@@ -276,11 +295,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading BigQuery...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Datasets")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDatasets {

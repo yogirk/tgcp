@@ -55,11 +55,11 @@ type Service struct {
 	filter              components.FilterModel
 	bucketFilterSession components.FilterSession[Bucket]
 	objectFilterSession components.FilterSession[Object]
+	spinner             components.SpinnerModel
 
 	// State
 	buckets []Bucket
 	objects []Object
-	loading bool
 	err     error
 
 	// View State
@@ -97,6 +97,7 @@ func NewService(cache *core.Cache) *Service {
 		table:       t,
 		objectTable: ot,
 		filter:      components.NewFilterWithPlaceholder("Filter buckets..."),
+		spinner:     components.NewSpinner(),
 		viewState:   ViewList,
 		cache:       cache,
 	}
@@ -164,8 +165,11 @@ func (s *Service) tick() tea.Cmd {
 
 // Refresh triggers a forced data reload
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchBucketsCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""), // Start animated spinner
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		s.fetchBucketsCmd(true),
+	)
 }
 
 // Reset clears the service state when navigating away or switching projects
@@ -204,28 +208,40 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	// Spinner Animation
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	// 1. Background Tick
 	case tickMsg:
 		return s, tea.Batch(s.fetchBucketsCmd(false), s.tick())
 
 	// 2. Data Loaded
 	case bucketsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.buckets = msg
 		s.bucketFilterSession.Apply(s.buckets)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case objectsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.objects = msg
 		s.objectFilterSession.Apply(s.objects)
 		s.objectTable.SetCursor(0)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	// 3. Error Handling
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:
@@ -284,8 +300,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Go to Object Browser
 				s.viewState = ViewObjects
 				s.currentPrefix = ""
-				s.loading = true
-				return s, s.fetchObjectsCmd()
+				return s, tea.Batch(s.fetchObjectsCmd(), s.spinner.Start(""))
 			}
 
 		} else if s.viewState == ViewObjects {
@@ -295,8 +310,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.viewState = ViewDetail // Back to Details
 				} else {
 					s.currentPrefix = parentPrefix(s.currentPrefix)
-					s.loading = true
-					return s, s.fetchObjectsCmd()
+					return s, tea.Batch(s.fetchObjectsCmd(), s.spinner.Start(""))
 				}
 				return s, nil
 			case "enter":
@@ -306,8 +320,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					obj := objs[idx]
 					if obj.Type == "Folder" {
 						s.currentPrefix = obj.Name
-						s.loading = true
-						return s, s.fetchObjectsCmd()
+						return s, tea.Batch(s.fetchObjectsCmd(), s.spinner.Start(""))
 					} else {
 						s.selectedObject = &obj
 					}
@@ -328,11 +341,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading storage buckets...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Buckets")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {

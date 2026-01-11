@@ -34,7 +34,10 @@ const (
 // Msg types
 type clustersMsg []Cluster
 type errMsg error
-type actionResultMsg struct{ err error }
+type actionResultMsg struct {
+	err error
+	msg string
+}
 
 // -----------------------------------------------------------------------------
 // Service Definition
@@ -48,10 +51,10 @@ type Service struct {
 	// UI Components
 	filter        components.FilterModel
 	filterSession components.FilterSession[Cluster]
+	spinner       components.SpinnerModel
 
 	// State
 	clusters []Cluster
-	loading  bool
 	err      error
 
 	// View State
@@ -82,6 +85,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter clusters..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -141,8 +145,11 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchClustersCmd(true) // force refresh
+	return tea.Batch(
+		s.spinner.Start(""),
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		s.fetchClustersCmd(true),
+	)
 }
 
 func (s *Service) Reset() {
@@ -173,24 +180,38 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchClustersCmd(false), s.tick())
 
 	case clustersMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.clusters = msg
 		s.filterSession.Apply(s.clusters)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case actionResultMsg:
 		if msg.err != nil {
 			s.err = msg.err
+			return s, func() tea.Msg {
+				return core.ToastMsg{Message: msg.err.Error(), Type: core.ToastError}
+			}
+		} else if msg.msg != "" {
+			return s, func() tea.Msg {
+				return core.ToastMsg{Message: msg.msg, Type: core.ToastSuccess}
+			}
 		}
-		// Don't auto verify/refresh for external commands usually, but ok.
 		return s, nil
 
 	case tea.WindowSizeMsg:
@@ -275,11 +296,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading && len(s.clusters) == 0 {
-		return components.RenderSpinner("Loading Kubernetes clusters...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Clusters")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -375,9 +398,12 @@ func (s *Service) launchK9s(c Cluster) tea.Cmd {
 			// Best effort: Run gcloud get-credentials then k9s
 			cmdStr := fmt.Sprintf("gcloud container clusters get-credentials %s --zone %s --project %s && k9s", c.Name, c.Location, s.projectID)
 			return tea.ExecProcess(exec.Command("bash", "-c", cmdStr), func(err error) tea.Msg {
-				return actionResultMsg{err}
+				if err != nil {
+					return actionResultMsg{err: err}
+				}
+				return actionResultMsg{msg: "k9s session ended"}
 			})
 		}
-		return actionResultMsg{nil}
+		return actionResultMsg{msg: "k9s session ended"}
 	})
 }

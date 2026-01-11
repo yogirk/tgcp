@@ -65,11 +65,11 @@ type Service struct {
 	filter                components.FilterModel
 	serviceFilterSession  components.FilterSession[RunService]
 	functionFilterSession components.FilterSession[Function]
+	spinner               components.SpinnerModel
 
 	// State
 	services  []RunService
 	functions []Function
-	loading   bool
 	err       error
 
 	viewState       ViewState
@@ -106,6 +106,7 @@ func NewService(cache *core.Cache) *Service {
 		funcTable: ft,
 		activeTab: TabServices,
 		filter:    components.NewFilterWithPlaceholder("Filter services..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -170,12 +171,17 @@ func (s *Service) tick() tea.Cmd {
 
 // Refresh triggers a forced data reload
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
+	var fetchCmd tea.Cmd
 	if s.activeTab == TabServices {
-		return s.fetchDataCmd(true)
+		fetchCmd = s.fetchDataCmd(true)
 	} else {
-		return s.fetchFunctionsCmd(true)
+		fetchCmd = s.fetchFunctionsCmd(true)
 	}
+	return tea.Batch(
+		s.spinner.Start(""),
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		fetchCmd,
+	)
 }
 
 // Reset clears the service state when navigating away or switching projects
@@ -214,6 +220,11 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	// Spinner Animation
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	// 1. Background Tick
 	case tickMsg:
 		var batch []tea.Cmd
@@ -227,21 +238,28 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 2. Data Loaded
 	case servicesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.services = msg
 		s.serviceFilterSession.Apply(s.services)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case functionsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.functions = msg
 		s.functionFilterSession.Apply(s.functions)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	// 3. Error Handling
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	// 4. Window Resize
 	case tea.WindowSizeMsg:
@@ -276,8 +294,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Switch Tab (Cycle)
 				if s.activeTab == TabServices {
 					s.activeTab = TabFunctions
-					s.loading = true
-					return s, s.fetchFunctionsCmd(true)
+					return s, tea.Batch(s.fetchFunctionsCmd(true), s.spinner.Start(""))
 				} else {
 					s.activeTab = TabServices
 					s.serviceFilterSession.Apply(s.services)
@@ -336,11 +353,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading Cloud Run services...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Services")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {

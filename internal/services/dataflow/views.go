@@ -9,11 +9,13 @@ import (
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.jobs) == 0 {
-		return components.RenderSpinner("Loading Dataflow Jobs...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Dataflow", "Jobs")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {

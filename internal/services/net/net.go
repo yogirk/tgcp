@@ -62,7 +62,7 @@ type Service struct {
 	networks  []Network
 	subnets   []Subnet
 	firewalls []Firewall
-	loading   bool
+	spinner   components.SpinnerModel
 	err       error
 
 	viewState       ViewState
@@ -105,6 +105,7 @@ func NewService(cache *core.Cache) *Service {
 		networksTable:  nTable,
 		subnetsTable:   sTable,
 		firewallsTable: fTable,
+		spinner:        components.NewSpinner(),
 		viewState:      ViewList,
 		activeTab:      TabSubnets,
 		cache:          cache,
@@ -149,14 +150,20 @@ func (s *Service) Init() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
+	var fetchCmd tea.Cmd
 	if s.viewState == ViewList {
-		return s.fetchNetworksCmd()
+		fetchCmd = s.fetchNetworksCmd()
 	} else if s.viewState == ViewDetail {
-		// Refresh both for details
-		return tea.Batch(s.fetchSubnetsCmd(), s.fetchFirewallsCmd())
+		fetchCmd = tea.Batch(s.fetchSubnetsCmd(), s.fetchFirewallsCmd())
 	}
-	return nil
+	if fetchCmd == nil {
+		return nil
+	}
+	return tea.Batch(
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		fetchCmd,
+		s.spinner.Start(""),
+	)
 }
 
 func (s *Service) Reset() {
@@ -190,6 +197,10 @@ func (s *Service) Blur() {
 func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		if s.viewState == ViewList {
 			return s, tea.Batch(s.fetchNetworksCmd(), s.Init())
@@ -197,26 +208,36 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, s.Init()
 
 	case networksMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.networks = msg
 		s.updateNetworksTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case subnetsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.subnets = msg
 		s.updateSubnetsTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case firewallsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.firewalls = msg
 		s.updateFirewallsTable()
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case tea.WindowSizeMsg:
 		s.networksTable.HandleWindowSizeDefault(msg)
@@ -236,8 +257,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.selectedNetwork = &s.networks[s.networksTable.Cursor()]
 					s.viewState = ViewDetail
 					s.activeTab = TabSubnets // Default to subnets
-					s.loading = true
-					return s, tea.Batch(s.fetchSubnetsCmd(), s.fetchFirewallsCmd())
+					return s, tea.Batch(s.fetchSubnetsCmd(), s.fetchFirewallsCmd(), s.spinner.Start(""))
 				}
 			}
 			var updatedTable *components.StandardTable
@@ -279,11 +299,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading Networking...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Networks")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewList {

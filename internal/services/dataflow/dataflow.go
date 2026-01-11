@@ -43,7 +43,7 @@ type Service struct {
 	filterSession components.FilterSession[Job]
 
 	jobs    []Job
-	loading bool
+	spinner components.SpinnerModel
 	err     error
 
 	viewState   ViewState
@@ -65,6 +65,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter jobs..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -118,8 +119,11 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchJobsCmd(true)
+	return tea.Batch(
+		func() tea.Msg { return core.LoadingMsg{IsLoading: true} },
+		s.fetchJobsCmd(true),
+		s.spinner.Start(""),
+	)
 }
 
 func (s *Service) Reset() {
@@ -150,18 +154,26 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchJobsCmd(false), s.tick())
 
 	case jobsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.jobs = msg
 		s.filterSession.Apply(s.jobs)
-		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
+		return s, tea.Batch(
+			func() tea.Msg { return core.LoadingMsg{IsLoading: false} },
+			func() tea.Msg { return core.LastUpdatedMsg(time.Now()) },
+		)
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, func() tea.Msg { return core.LoadingMsg{IsLoading: false} }
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)
