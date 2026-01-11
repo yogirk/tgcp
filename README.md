@@ -2,38 +2,23 @@
 
 TGCP is a terminal-based user interface for observing and managing Google Cloud Platform resources, inspired by tools like K9s and TAWS. It provides a fast, keyboard-driven experience for DevOps engineers and Cloud Administrators.
 
-![Banner](assets/banner.txt)
+![alt text](image.png)
 
-## Features (MVP)
-
-- **🚀 Fast Navigation**: Instant switching between services and views using keyboard shortcuts.
-- **🔐 Secure Authentication**: Uses Application Default Credentials (ADC) for seamless and secure login.
-- **🔀 Project Switcher**: Instant cross-project switching via Command Palette.
-- **⚡ Smart Caching**: Built-in caching layer to reduce API calls and improve responsiveness.
-- **☁️ Supported Services**:
-    - **Compute Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration (splits Tmux pane automatically).
-    - **Cloud SQL**: Monitor database instances, check status and configurations, start/stop.
-    - **IAM**: Audit service accounts and policies.
-    - **Kubernetes Engine (GKE)**: View Clusters and Node Pools. Launch **k9s** instantly with `K`.
-    - **Disks**: Manage Persistent Disks and identify **Orphaned** (unused) storage.
-    - **Comput Engine (GCE)**: List instances, view details, start/stop instances. **Smart SSH** integration.
-    - **Cloud Run**: List services, view revisions, and explore **Cloud Functions** in a dedicated tab.
-    - **Cloud Storage (GCS)**: Browse buckets and navigate objects.
-    - **Networking**: VPC Networks and Subnets.
-    - **Data & Databases**:
-        - **Cloud SQL**: Monitor database instances.
-        - **Spanner**: High-performance database clusters.
-        - **Bigtable**: Wide-column NoSQL storage.
-        - **Firestore**: Document database.
-        - **Memorystore (Redis)**: In-memory data store.
-    - **Messaging & Analytics**:
-        - **Pub/Sub**: Topics, Subscriptions, and Backlog monitoring.
-        - **BigQuery**: Datasets and Tables.
-        - **Dataflow**: Stream/Batch job monitoring.
-        - **Dataproc**: Managed Spark/Hadoop clusters.
-- **🔍 Filtering**: Real-time fuzzy filtering for all resource lists.
-- **🛡️ Safety First**: Confirmation dialogs for all state-changing actions.
-- **📖 Comprehensive Guide**: See [FEATURES.md](FEATURES.md) for a deep dive into all capabilities.
+- **💡 Observability First**: Designed for reading statuses, logs, and configurations quickly.
+- **🚀 Fast Navigation**: Global vim-style keybindings (`j/k`, `Shift+H/L`).
+- **🔐 Secure Authentication**: Uses Application Default Credentials (ADC) - no new keys to manage.
+- **⚡ Smart Caching**: Instant tab switching with background data refreshes.
+- **🛠️ Service Support**:
+    - **Compute**: GCE Instances (Manage power state, SSH), GKE Clusters (Launch k9s), Cloud Run, Cloud Functions.
+    - **Data**: Cloud SQL, BigQuery, Bigtable, Spanner, Firestore, Redis.
+    - **Storage**: GCS Buckets, Persistent Disks.
+    - **Networking**: VPCs, Subnets.
+    - **Analytics**: Pub/Sub, Dataflow, Dataproc.
+- **🛡️ Safety**: Read-only by default for sensitive configs; confirmation dialogs for actions.
+- **📚 Documentation**:
+    - [Feature Deep Dive](docs/features.md)
+    - [Developer Guide](docs/developer_guide.md)
+    - [UI Patterns](docs/ui_patterns.md)
 
 ## Recommended Font
 

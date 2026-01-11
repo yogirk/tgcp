@@ -31,10 +31,26 @@ func (m MainModel) View() string {
 	statusBar := m.StatusBar.View()
 
 	// Layout Content + Status Bar
-	// But first, let's just make the root content
 	screen := lipgloss.JoinVertical(lipgloss.Top, content, statusBar)
 
-	// 3. Overlays (Command Palette)
+	// 3. Toast Overlay (if active)
+	if m.Toast != nil && !m.Toast.IsExpired() {
+		toastView := m.Toast.View()
+		// Position toast at bottom-right, above status bar
+		screen = lipgloss.JoinVertical(lipgloss.Top,
+			content,
+			lipgloss.PlaceHorizontal(m.Width, lipgloss.Right, toastView),
+			statusBar,
+		)
+	}
+
+	// 4. Loading Spinner (if active) - show inline at top of content
+	if m.Spinner.IsActive() {
+		spinnerView := m.Spinner.View()
+		screen = lipgloss.JoinVertical(lipgloss.Top, spinnerView, content, statusBar)
+	}
+
+	// 5. Overlays (Command Palette)
 	if m.Navigation.PaletteActive {
 		// Overlay Palette on top of the entire screen
 		// Note: Palette.Render uses lipgloss.Place to center itself in the given dimensions
@@ -69,10 +85,7 @@ func renderLandingPage(m MainModel) string {
 		m.AuthState.UserEmail,
 		m.AuthState.ProjectID,
 	)
-	infoBox := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorBorderSubtle).
-		Padding(1).
+	infoBox := styles.PrimaryBoxStyle.Copy().
 		Render(userInfo)
 
 	// Menu
@@ -104,9 +117,7 @@ func renderLandingPage(m MainModel) string {
 		"h      SSH Connect",
 	)
 
-	hints := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorBorderSubtle).
+	hints := styles.SecondaryBoxStyle.Copy().
 		Padding(1, 2).
 		Render(lipgloss.JoinHorizontal(lipgloss.Top,
 			col1,

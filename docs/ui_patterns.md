@@ -23,6 +23,25 @@ TGCP uses a semantic color system defined in `internal/styles/styles.go`. Avoid 
 -   **Labels**: Bold, `ColorTextMuted`. Use `LabelStyle`.
 -   **Values**: Regular, `ColorTextPrimary`. Use `ValueStyle`.
 
+## Border Hierarchy
+
+TGCP uses a two-tier border system to create visual hierarchy:
+
+| Style | Use Case | Visual |
+| :--- | :--- | :--- |
+| `PrimaryBoxStyle` | Main content (detail cards, modals) | Rounded border, accent color (#75), more padding |
+| `SecondaryBoxStyle` | Supporting content (hints, sections) | Normal border, subtle grey (#240), less padding |
+
+```go
+// Main content - prominent
+styles.PrimaryBoxStyle.Render(mainContent)
+
+// Supporting content - subtle
+styles.SecondaryBoxStyle.Render(hints)
+```
+
+This ensures users can quickly identify the primary focus area vs. supporting information.
+
 ## Standard Components
 
 ### 1. Main Layout
@@ -87,6 +106,26 @@ The filter component (`components.FilterModel`) has three visual states:
 ### 7. Overlays
 -   **Command Palette**: Modal overlay centered on screen.
 -   **Dialogs**: Use `components.RenderConfirmation()` for destructive actions.
+
+### 8. Toast Notifications
+Use `core.ToastMsg` to show temporary notifications for action feedback.
+
+```go
+// From a service action result:
+return s, func() tea.Msg {
+    return core.ToastMsg{
+        Message: "Starting instance prod-web-1...",
+        Type:    core.ToastSuccess,  // ToastSuccess, ToastError, ToastInfo
+    }
+}
+```
+
+Toast types:
+-   **ToastSuccess** (green): Action completed successfully
+-   **ToastError** (red): Action failed
+-   **ToastInfo** (blue): Informational message
+
+Toasts auto-dismiss after 3 seconds (default) or custom duration.
 
 ## Interaction Patterns
 

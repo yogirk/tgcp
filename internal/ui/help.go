@@ -113,11 +113,9 @@ func HelpView(width, height int) string {
 
 	footer := styles.SubtleStyle.Render("Press ? or Esc to close")
 
-	dialog := styles.BoxStyle.Copy().
+	dialog := styles.PrimaryBoxStyle.Copy().
 		Width(dialogWidth).
-		Border(lipgloss.RoundedBorder()).
 		BorderForeground(styles.ColorBrandPrimary).
-		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Center,
 			banner,
 			"\n",

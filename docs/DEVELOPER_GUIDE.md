@@ -76,8 +76,20 @@ TGCP uses a set of standard components to ensure consistency. See `docs/ui_patte
 -   **RenderError()**: Standardized error display with suggestions.
 -   **RenderConfirmation()**: Confirmation dialog for destructive actions.
 
+### Toast Notifications
+Use `core.ToastMsg` to provide action feedback:
+```go
+return s, func() tea.Msg {
+    return core.ToastMsg{Message: "Instance started", Type: core.ToastSuccess}
+}
+```
+
 ### Styles
 Always use styles from `internal/styles/styles.go` instead of defining custom Lipgloss styles.
+
+**Border Hierarchy:**
+-   `PrimaryBoxStyle`: Main content cards, modals (rounded border, accent color)
+-   `SecondaryBoxStyle`: Supporting content, hints (normal border, subtle grey)
 
 ## Coding Standards
 

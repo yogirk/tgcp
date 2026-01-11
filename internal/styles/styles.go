@@ -18,9 +18,24 @@ var (
 	BaseStyle = lipgloss.NewStyle().
 			Foreground(ColorTextPrimary)
 
-	// Component Styles
+	// Component Styles - Box Hierarchy
+	// BoxStyle is the base (kept for backwards compatibility)
 	BoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBorderSubtle).
+			Padding(0, 1)
+
+	// PrimaryBoxStyle - for main content cards (detail views, active panels)
+	// Rounded border with accent color for visual prominence
+	PrimaryBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBrandAccent).
+			Padding(1, 2)
+
+	// SecondaryBoxStyle - for supporting content (metadata, sections)
+	// Normal border with subtle color, less prominent
+	SecondaryBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder()).
 			BorderForeground(ColorBorderSubtle).
 			Padding(0, 1)
 

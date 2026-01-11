@@ -31,9 +31,6 @@ var (
 )
 
 func (s *Service) View() string {
-	if s.data.InfoLoading && s.data.Info.BillingAccountID == "" {
-		return components.RenderSpinner("Loading Overview...")
-	}
 	if s.data.Error != nil {
 		return components.RenderError(s.data.Error, "Overview", "Project Overview")
 	}

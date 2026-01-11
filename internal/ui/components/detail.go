@@ -38,9 +38,8 @@ func DetailCard(opts DetailCardOpts) string {
 	title := styles.LabelStyle.Render(fmt.Sprintf("╭─ %s ─", opts.Title))
 	body := renderKeyValues(opts.Rows, styles.LabelStyle, styles.ValueStyle)
 
-	box := styles.BoxStyle.Copy().
+	box := styles.PrimaryBoxStyle.Copy().
 		BorderForeground(borderColor).
-		Padding(1).
 		Width(width).
 		Render(body)
 
@@ -58,7 +57,7 @@ func DetailSection(title, body string, borderColor lipgloss.Color) string {
 		borderColor = styles.ColorBorderSubtle
 	}
 	content := lipgloss.JoinVertical(lipgloss.Left, styles.HeaderStyle.Render(title), body)
-	return styles.BoxStyle.Copy().
+	return styles.SecondaryBoxStyle.Copy().
 		BorderForeground(borderColor).
 		Width(80).
 		Render(content)
