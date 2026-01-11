@@ -10,11 +10,13 @@ import (
 )
 
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading Pub/Sub...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Pub/Sub", "Topics")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetailTopic {
@@ -26,6 +28,16 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	listLabel := "Topics"
+	if s.viewState == ViewListSubs {
+		listLabel = "Subscriptions"
+	}
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		listLabel,
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -38,16 +50,23 @@ func (s *Service) renderDetailTopic() string {
 		return ""
 	}
 
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(styles.ColorPrimary).Render("📡 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Topic: %s", t.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Topics",
+		t.Name,
 	)
 
-	details := fmt.Sprintf("Project: %s\nKMS Key: %s", t.ProjectID, t.KmsKeyName)
-	box := styles.BoxStyle.Copy().Width(60).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Topic Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: t.Name},
+			{Key: "Project", Value: t.ProjectID},
+			{Key: "KMS Key", Value: t.KmsKeyName},
+		},
+		Width: 60,
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }
 
 func (s *Service) renderDetailSub() string {
@@ -56,14 +75,11 @@ func (s *Service) renderDetailSub() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if sub.DeadLetterTopic != "" {
-		statusColor = styles.ColorWarning // Warn if DLQ configured (just for visibility)
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("📨 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Subscription: %s", sub.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Subscriptions",
+		sub.Name,
 	)
 
 	dlqMsg := "None"
@@ -71,23 +87,21 @@ func (s *Service) renderDetailSub() string {
 		dlqMsg = styles.ErrorStyle.Render(sub.DeadLetterTopic)
 	}
 
-	details := fmt.Sprintf(
-		"Topic: %s\nType: %s\nAck Deadline: %d sec\nRetain Acked: %v\nDead Letter Topic: %s",
-		sub.Topic,
-		func() string {
-			if sub.PushEndpoint != "" {
-				return "Push (" + sub.PushEndpoint + ")"
-			} else {
-				return "Pull"
-			}
-		}(),
-		sub.AckDeadline,
-		sub.RetainAcked,
-		dlqMsg,
-	)
+	subType := "Pull"
+	if sub.PushEndpoint != "" {
+		subType = "Push (" + sub.PushEndpoint + ")"
+	}
 
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Subscription Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: sub.Name},
+			{Key: "Topic", Value: sub.Topic},
+			{Key: "Type", Value: subType},
+			{Key: "Ack Deadline", Value: fmt.Sprintf("%d sec", sub.AckDeadline)},
+			{Key: "Retain Acked", Value: fmt.Sprintf("%v", sub.RetainAcked)},
+			{Key: "Dead Letter Topic", Value: dlqMsg},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

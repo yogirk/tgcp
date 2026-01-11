@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) renderDetailView() string {
@@ -14,38 +15,25 @@ func (s *Service) renderDetailView() string {
 	}
 	d := s.selectedDisk
 
-	statusColor := styles.ColorSuccess
-	if d.Status != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
-	// 1. Header with Status Bubble
-	headerTitle := fmt.Sprintf("💾 Disk: %s (%s)", d.Name, d.Status)
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("● "),
-		styles.HeaderStyle.Render(headerTitle),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Disks",
+		d.Name,
 	)
 
-	// 2. Details Box
-	detailsContent := fmt.Sprintf(
-		"Zone: %s\nCreated: %s\nType: %s\nSize: %d GB\nSource Image: %s",
-		d.Zone,
-		"N/A", // Timestamp parsing left for polish
-		d.ShortType(),
-		d.SizeGb,
-		d.SourceImage,
-	)
-
-	detailsBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorSecondary).
-		Width(80).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				header,
-				" ",
-				detailsContent,
-			),
-		)
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Disk Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: d.Name},
+			{Key: "Status", Value: components.RenderStatus(d.Status)},
+			{Key: "Zone", Value: d.Zone},
+			{Key: "Created", Value: "N/A"},
+			{Key: "Type", Value: d.ShortType()},
+			{Key: "Size", Value: fmt.Sprintf("%d GB", d.SizeGb)},
+			{Key: "Source Image", Value: d.SourceImage},
+		},
+	})
 
 	// 3. Attachment Box
 	var attachContent string
@@ -61,18 +49,12 @@ func (s *Service) renderDetailView() string {
 		attachContent = strings.Join(lines, "\n")
 	}
 
-	attachBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorSubtext).
-		Width(80).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				styles.HeaderStyle.Render("🔗 Attachment"),
-				attachContent,
-			),
-		)
+	attachBox := components.DetailSection("Attachment", attachContent, styles.ColorBorderSubtle)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
-		detailsBox,
+		breadcrumb,
+		"",
+		card,
 		"",
 		attachBox,
 	)

@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.jobs) == 0 {
-		return components.RenderSpinner("Loading Dataflow Jobs...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Dataflow", "Jobs")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -23,6 +24,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Jobs",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -35,31 +42,23 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	cleanState := strings.Replace(j.State, "JOB_STATE_", "", 1)
-	statusColor := styles.ColorSuccess
-	if cleanState != "RUNNING" && cleanState != "DONE" {
-		statusColor = styles.ColorWarning
-	}
-	if cleanState == "FAILED" || cleanState == "CANCELLED" {
-		statusColor = styles.ColorError
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🌊 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Job: %s", j.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Jobs",
+		j.Name,
 	)
 
-	details := fmt.Sprintf(
-		"ID: %s\nType: %s\nState: %s\nLocation: %s\nCreated: %s",
-		j.ID,
-		strings.Replace(j.Type, "JOB_TYPE_", "", 1),
-		cleanState,
-		j.Location,
-		j.CreateTime, // ISO string
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Job Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: j.Name},
+			{Key: "ID", Value: j.ID},
+			{Key: "Type", Value: strings.Replace(j.Type, "JOB_TYPE_", "", 1)},
+			{Key: "State", Value: components.RenderStatus(j.State)},
+			{Key: "Location", Value: j.Location},
+			{Key: "Created", Value: j.CreateTime},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

@@ -25,9 +25,13 @@ type ViewState int
 const (
 	ViewList ViewState = iota
 	ViewDetail
+	ViewNamespaces  // Datastore mode: list namespaces
+	ViewKinds       // Datastore mode: list kinds in a namespace
 )
 
 type dbsMsg []Database
+type namespacesMsg []Namespace
+type kindsMsg []Kind
 type errMsg error
 
 // -----------------------------------------------------------------------------
@@ -43,11 +47,18 @@ type Service struct {
 	filterSession components.FilterSession[Database]
 
 	dbs     []Database
-	loading bool
+	spinner components.SpinnerModel
 	err     error
 
 	viewState  ViewState
 	selectedDB *Database
+
+	// Datastore mode navigation
+	namespaces        []Namespace
+	selectedNamespace *Namespace
+	kinds             []Kind
+	nsTable           *components.StandardTable
+	kindTable         *components.StandardTable
 
 	cache *core.Cache
 }
@@ -62,9 +73,24 @@ func NewService(cache *core.Cache) *Service {
 
 	t := components.NewStandardTable(columns)
 
+	// Namespace table for Datastore mode
+	nsColumns := []table.Column{
+		{Title: "Namespace", Width: 50},
+	}
+	nsTable := components.NewStandardTable(nsColumns)
+
+	// Kind table for Datastore mode
+	kindColumns := []table.Column{
+		{Title: "Kind", Width: 50},
+	}
+	kindTable := components.NewStandardTable(kindColumns)
+
 	svc := &Service{
 		table:     t,
+		nsTable:   nsTable,
+		kindTable: kindTable,
 		filter:    components.NewFilterWithPlaceholder("Filter databases..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -81,10 +107,16 @@ func (s *Service) ShortName() string {
 }
 
 func (s *Service) HelpText() string {
-	if s.viewState == ViewList {
+	switch s.viewState {
+	case ViewList:
 		return "r:Refresh  /:Filter  Ent:Detail"
+	case ViewNamespaces:
+		return "r:Refresh  Ent:Kinds  Esc/q:Back"
+	case ViewKinds:
+		return "Esc/q:Back"
+	default:
+		return "Esc/q:Back"
 	}
-	return "Esc/q:Back"
 }
 
 // -----------------------------------------------------------------------------
@@ -118,15 +150,22 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchDBsCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""),
+		s.fetchDBsCmd(true),
+	)
 }
 
 func (s *Service) Reset() {
 	s.viewState = ViewList
 	s.selectedDB = nil
+	s.selectedNamespace = nil
+	s.namespaces = nil
+	s.kinds = nil
 	s.err = nil
 	s.table.SetCursor(0)
+	s.nsTable.SetCursor(0)
+	s.kindTable.SetCursor(0)
 	s.filter.ExitFilterMode()
 }
 
@@ -150,21 +189,40 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchDBsCmd(false), s.tick())
 
 	case dbsMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.dbs = msg
 		s.filterSession.Apply(s.dbs)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
+	case namespacesMsg:
+		s.spinner.Stop()
+		s.namespaces = msg
+		s.updateNsTable(msg)
+		return s, nil
+
+	case kindsMsg:
+		s.spinner.Stop()
+		s.kinds = msg
+		s.updateKindTable(msg)
+		return s, nil
+
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)
+		s.nsTable.HandleWindowSizeDefault(msg)
+		s.kindTable.HandleWindowSizeDefault(msg)
 
 	case tea.KeyMsg:
 		// Handle filter mode (only in list view)
@@ -190,6 +248,14 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dbs := s.getFilteredDBs(s.dbs, s.filter.Value())
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(dbs) {
 					s.selectedDB = &dbs[idx]
+					// For Datastore mode, go to namespaces; for Firestore mode, go to detail
+					if s.selectedDB.IsDatastoreMode() {
+						s.viewState = ViewNamespaces
+						return s, tea.Batch(
+							s.spinner.Start("Loading namespaces..."),
+							s.fetchNamespacesCmd(),
+						)
+					}
 					s.viewState = ViewDetail
 				}
 			}
@@ -206,6 +272,48 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.selectedDB = nil
 				return s, nil
 			}
+		}
+
+		if s.viewState == ViewNamespaces {
+			switch msg.String() {
+			case "esc", "q":
+				s.viewState = ViewList
+				s.selectedDB = nil
+				s.namespaces = nil
+				return s, nil
+			case "r":
+				return s, tea.Batch(
+					s.spinner.Start("Loading namespaces..."),
+					s.fetchNamespacesCmd(),
+				)
+			case "enter":
+				if idx := s.nsTable.Cursor(); idx >= 0 && idx < len(s.namespaces) {
+					s.selectedNamespace = &s.namespaces[idx]
+					s.viewState = ViewKinds
+					return s, tea.Batch(
+						s.spinner.Start("Loading kinds..."),
+						s.fetchKindsCmd(),
+					)
+				}
+			}
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.nsTable.Update(msg)
+			s.nsTable = updatedTable
+			return s, cmd
+		}
+
+		if s.viewState == ViewKinds {
+			switch msg.String() {
+			case "esc", "q":
+				s.viewState = ViewNamespaces
+				s.selectedNamespace = nil
+				s.kinds = nil
+				return s, nil
+			}
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.kindTable.Update(msg)
+			s.kindTable = updatedTable
+			return s, cmd
 		}
 	}
 	return s, nil
@@ -261,4 +369,50 @@ func (s *Service) getFilteredDBs(dbs []Database, query string) []Database {
 	return components.FilterSlice(dbs, query, func(db Database, q string) bool {
 		return components.ContainsMatch(db.Name, db.Type, db.Location)(q)
 	})
+}
+
+// fetchNamespacesCmd fetches namespaces for Datastore mode database
+func (s *Service) fetchNamespacesCmd() tea.Cmd {
+	return func() tea.Msg {
+		if s.client == nil || s.selectedDB == nil {
+			return errMsg(fmt.Errorf("client or database not selected"))
+		}
+		items, err := s.client.ListNamespaces(s.projectID, s.selectedDB.Name)
+		if err != nil {
+			return errMsg(err)
+		}
+		return namespacesMsg(items)
+	}
+}
+
+// fetchKindsCmd fetches kinds for the selected namespace
+func (s *Service) fetchKindsCmd() tea.Cmd {
+	return func() tea.Msg {
+		if s.client == nil || s.selectedDB == nil || s.selectedNamespace == nil {
+			return errMsg(fmt.Errorf("client, database, or namespace not selected"))
+		}
+		items, err := s.client.ListKinds(s.projectID, s.selectedDB.Name, s.selectedNamespace.Name)
+		if err != nil {
+			return errMsg(err)
+		}
+		return kindsMsg(items)
+	}
+}
+
+// updateNsTable updates the namespace table with items
+func (s *Service) updateNsTable(items []Namespace) {
+	rows := make([]table.Row, len(items))
+	for i, item := range items {
+		rows[i] = table.Row{item.Name}
+	}
+	s.nsTable.SetRows(rows)
+}
+
+// updateKindTable updates the kind table with items
+func (s *Service) updateKindTable(items []Kind) {
+	rows := make([]table.Row, len(items))
+	for i, item := range items {
+		rows[i] = table.Row{item.Name}
+	}
+	s.kindTable.SetRows(rows)
 }

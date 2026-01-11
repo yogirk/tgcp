@@ -45,7 +45,7 @@ type Service struct {
 	filterSession components.FilterSession[Disk]
 
 	disks   []Disk
-	loading bool
+	spinner components.SpinnerModel
 	err     error
 
 	viewState    ViewState
@@ -72,6 +72,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter disks..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -131,8 +132,10 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchDisksCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""),
+		s.fetchDisksCmd(true),
+	)
 }
 
 func (s *Service) Reset() {
@@ -163,18 +166,23 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchDisksCmd(false), s.tick())
 
 	case disksMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.disks = msg
 		s.filterSession.Apply(s.disks)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
 	case actionResultMsg:
 		if msg.err != nil {
@@ -257,11 +265,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // -----------------------------------------------------------------------------
 
 func (s *Service) View() string {
-	if s.loading && len(s.disks) == 0 {
-		return components.RenderSpinner("Loading GCE Disks...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Disks")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -280,6 +290,12 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Disks",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())

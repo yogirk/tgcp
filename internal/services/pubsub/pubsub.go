@@ -48,7 +48,7 @@ type Service struct {
 	topics []Topic
 	subs   []Subscription
 
-	loading bool
+	spinner components.SpinnerModel
 	err     error
 
 	viewState     ViewState
@@ -70,6 +70,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter topics/subscriptions..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewListTopics,
 		cache:     cache,
 	}
@@ -127,10 +128,11 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	// Refresh both? Or just current view?
-	// Simpler to refresh both
-	return tea.Batch(s.fetchTopicsCmd(true), s.fetchSubsCmd(true))
+	return tea.Batch(
+		s.spinner.Start(""),
+		s.fetchTopicsCmd(true),
+		s.fetchSubsCmd(true),
+	)
 }
 
 func (s *Service) Reset() {
@@ -163,13 +165,17 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchTopicsCmd(false), s.fetchSubsCmd(false), s.tick())
 
 	case topicsMsg:
 		s.topics = msg
 		if s.viewState == ViewListTopics {
-			s.loading = false
+			s.spinner.Stop()
 			s.topicFilterSession.Apply(s.topics)
 		}
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
@@ -177,14 +183,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case subsMsg:
 		s.subs = msg
 		if s.viewState == ViewListSubs {
-			s.loading = false
+			s.spinner.Stop()
 			s.subFilterSession.Apply(s.subs)
 		}
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)
@@ -220,8 +227,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.viewState = ViewListSubs
 					s.subFilterSession.Apply(s.subs) // Render existing if available
 					if len(s.subs) == 0 {
-						s.loading = true
-						return s, s.fetchSubsCmd(true)
+						return s, tea.Batch(s.fetchSubsCmd(true), s.spinner.Start(""))
 					}
 				}
 			case "t": // Switch to Topics
@@ -229,8 +235,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.viewState = ViewListTopics
 					s.topicFilterSession.Apply(s.topics)
 					if len(s.topics) == 0 {
-						s.loading = true
-						return s, s.fetchTopicsCmd(true)
+						return s, tea.Batch(s.fetchTopicsCmd(true), s.spinner.Start(""))
 					}
 				}
 			case "enter":

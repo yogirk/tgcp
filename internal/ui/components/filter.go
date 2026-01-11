@@ -56,39 +56,63 @@ func (m FilterModel) Update(msg tea.Msg) (FilterModel, tea.Cmd) {
 	return m, cmd
 }
 
-// View renders the filter input when active
+// View renders the filter input with clear state transitions:
+// - Inactive, no filter: Subtle hint "Press / to filter"
+// - Active: Prominent input with cursor
+// - Inactive with filter: Badge showing applied filter
 func (m FilterModel) View() string {
-	label := styles.SubtleStyle.Render("Filter:")
-
 	query := m.TextInput.Value()
-	queryView := m.TextInput.View()
-	if query == "" && !m.Active {
-		queryView = styles.SubtleStyle.Render("/ to filter")
-	}
 
+	// Style definitions
+	labelStyle := styles.SubtleStyle
+	hintStyle := styles.SubtleStyle
+	countStyle := styles.SubtleStyle
+	badgeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("232")).
+		Background(styles.ColorBrandAccent).
+		Padding(0, 1)
+	activeInputStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorTextPrimary)
+	sepStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorBorderSubtle)
+
+	// Count text
 	var countText string
 	if query == "" {
 		countText = fmt.Sprintf("Items: %d", m.Total)
 	} else {
 		countText = fmt.Sprintf("Matches: %d/%d", m.Matches, m.Total)
 	}
-	countView := styles.SubtleStyle.Render(countText)
+	countView := countStyle.Render(countText)
 
-	clearHint := ""
-	if query != "" {
-		clearHint = styles.SubtleStyle.Render("Esc:Clear")
-	}
+	var bar string
 
-	bar := lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		label,
-		" ",
-		queryView,
-		"  ",
-		countView,
-	)
-	if clearHint != "" {
-		bar = lipgloss.JoinHorizontal(lipgloss.Left, bar, "  ", clearHint)
+	if m.Active {
+		// ACTIVE STATE: Prominent input with cursor
+		label := labelStyle.Render("Filter:")
+		inputView := activeInputStyle.Render(m.TextInput.View())
+		bar = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			label, " ", inputView, "  ", countView,
+		)
+	} else if query != "" {
+		// INACTIVE WITH FILTER: Show badge + clear hint
+		label := labelStyle.Render("Filter:")
+		badge := badgeStyle.Render(query)
+		sep := sepStyle.Render(" │ ")
+		clearHint := hintStyle.Render("Esc to clear")
+		bar = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			label, " ", badge, "  ", countView, sep, clearHint,
+		)
+	} else {
+		// INACTIVE, NO FILTER: Subtle hint
+		label := labelStyle.Render("Filter:")
+		hint := hintStyle.Render("Press / to filter")
+		bar = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			label, " ", hint, "  ", countView,
+		)
 	}
 
 	return bar

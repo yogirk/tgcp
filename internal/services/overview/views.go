@@ -5,49 +5,49 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/ui/components"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 // Styles specific to billing dashboard
 var (
 	cardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(styles.ColorSubtext).
+			BorderForeground(styles.ColorTextMuted).
 			Padding(0, 1).
 			MarginBottom(1)
 
 	titleStyle = lipgloss.NewStyle().
-			Foreground(styles.ColorHighlight).
+			Foreground(styles.ColorBrandAccent).
 			Bold(true).
 			MarginBottom(1)
 
 	labelStyle = lipgloss.NewStyle().
-			Foreground(styles.ColorSubtext).
+			Foreground(styles.ColorTextMuted).
 			Width(15)
 
 	valueStyle = lipgloss.NewStyle().
-			Foreground(styles.ColorText)
+			Foreground(styles.ColorTextPrimary)
 )
 
 func (s *Service) View() string {
-	if s.data.InfoLoading && s.data.Info.BillingAccountID == "" {
-		return components.RenderSpinner("Loading Overview...")
-	}
 	if s.data.Error != nil {
 		return components.RenderError(s.data.Error, "Overview", "Project Overview")
 	}
 
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+	)
+
 	// 1. Header Section (Status + Account)
-	statusIcon := "🟢"
-	statusText := "Active"
+	billingStatus := "ACTIVE"
 	if !s.data.Info.Enabled {
-		statusIcon = "🔴"
-		statusText = "Disabled"
+		billingStatus = "DISABLED"
 	}
 
 	headerLeft := lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.NewStyle().Foreground(styles.ColorSuccess).Render(fmt.Sprintf("%s Billing %s", statusIcon, statusText)),
+		fmt.Sprintf("Billing: %s", components.RenderStatus(billingStatus)),
 		fmt.Sprintf("Project: %s", s.projectID),
 	)
 
@@ -59,7 +59,7 @@ func (s *Service) View() string {
 	// Top Header
 	header := cardStyle.Copy().Width(80).Render(
 		lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(styles.ColorHighlight).Bold(true).Render("📡 Project Overview"),
+			lipgloss.NewStyle().Foreground(styles.ColorBrandAccent).Bold(true).Render("📡 Project Overview"),
 			"",
 			lipgloss.JoinHorizontal(lipgloss.Top,
 				lipgloss.NewStyle().Width(40).Render(headerLeft),
@@ -235,6 +235,8 @@ func (s *Service) View() string {
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
+		breadcrumb,
+		"",
 		header,
 		savingsSection,
 		inventorySection,

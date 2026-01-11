@@ -44,7 +44,7 @@ type Service struct {
 
 	instances []Instance
 	clusters  []Cluster // For selected instance
-	loading   bool
+	spinner   components.SpinnerModel
 	err       error
 
 	viewState        ViewState
@@ -66,6 +66,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter instances..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -119,8 +120,10 @@ func (s *Service) tick() tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchInstancesCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""),
+		s.fetchInstancesCmd(true),
+	)
 }
 
 func (s *Service) Reset() {
@@ -152,11 +155,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		return s, tea.Batch(s.fetchInstancesCmd(false), s.tick())
 
 	case instancesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.instances = msg
 		s.filterSession.Apply(s.instances)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
@@ -166,8 +173,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// We don't change state here, just store data for view
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)

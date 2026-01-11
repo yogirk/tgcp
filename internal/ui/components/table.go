@@ -9,10 +9,11 @@ import (
 
 // Standard colors for table selection
 const (
-	TableSelectedFocused = lipgloss.Color("57")  // Purple when focused
-	TableSelectedBlurred = lipgloss.Color("243") // Neutral grey when blurred
-	TableTextFocused     = lipgloss.Color("229") // Light text when focused
-	TableTextBlurred     = lipgloss.Color("252") // Standard text when blurred
+	TableSelectedFocused = lipgloss.Color("236") // Dark grey background when focused
+	TableSelectedBlurred = lipgloss.Color("240") // Lighter grey background when blurred
+	TableTextFocused     = lipgloss.Color("39")  // Brand accent (light blue) when focused
+	TableTextBlurred     = lipgloss.Color("245") // Muted text when blurred
+	TableHeaderBg        = lipgloss.Color("237") // Subtle background for headers
 )
 
 // StandardTable is a standardized table component with built-in Focus/Blur and window size handling
@@ -80,16 +81,22 @@ func NewStandardTable(columns []table.Column, opts ...TableOption) *StandardTabl
 // applyStyles applies the appropriate styles based on focus state
 func (st *StandardTable) applyStyles() {
 	s := table.DefaultStyles()
-	s.Header = styles.HeaderStyle
+
+	// Header style: subtle background, bold, primary text
+	s.Header = lipgloss.NewStyle().
+		Foreground(styles.ColorTextPrimary).
+		Background(TableHeaderBg).
+		Bold(true).
+		Padding(0, 1)
 
 	if st.focused {
-		// Focused: Purple background, light text
+		// Focused: Dark grey background, accent text, bold
 		s.Selected = lipgloss.NewStyle().
 			Foreground(TableTextFocused).
 			Background(TableSelectedFocused).
-			Bold(false)
+			Bold(true)
 	} else {
-		// Blurred: Dark grey background, standard text
+		// Blurred: Lighter grey background, muted text
 		s.Selected = lipgloss.NewStyle().
 			Foreground(TableTextBlurred).
 			Background(TableSelectedBlurred).
@@ -178,15 +185,15 @@ func NewTable(columns []table.Column, rows []table.Row) TableModel {
 	)
 
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(true)
+	s.Header = lipgloss.NewStyle().
+		Foreground(styles.ColorTextPrimary).
+		Background(TableHeaderBg).
+		Bold(true).
+		Padding(0, 1)
 	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("62")). // Purple selection
-		Bold(false)
+		Foreground(TableTextFocused).
+		Background(TableSelectedFocused).
+		Bold(true)
 	t.SetStyles(s)
 
 	return TableModel{Table: t}

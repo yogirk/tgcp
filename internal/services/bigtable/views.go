@@ -10,11 +10,13 @@ import (
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.instances) == 0 {
-		return components.RenderSpinner("Loading Bigtable Instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Bigtable", "Instances")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -23,6 +25,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -35,27 +43,23 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if i.State != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🥞 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Instance: %s", i.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+		i.Name,
 	)
 
-	details := fmt.Sprintf(
-		"Display Name: %s\nType: %s\nState: %s\nProject: %s",
-		i.DisplayName,
-		i.Type,
-		i.State,
-		i.ProjectID,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Instance Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: i.Name},
+			{Key: "Status", Value: components.RenderStatus(i.State)},
+			{Key: "Display Name", Value: i.DisplayName},
+			{Key: "Type", Value: i.Type},
+			{Key: "Project", Value: i.ProjectID},
+		},
+	})
 
 	// Clusters
 	clusterContent := components.RenderSpinner("Loading clusters...")
@@ -79,18 +83,12 @@ func (s *Service) renderDetailView() string {
 		}
 	}
 
-	clusterBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorSubtext).
-		Width(80).
-		Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				styles.HeaderStyle.Render("Clusters"),
-				clusterContent,
-			),
-		)
+	clusterBox := components.DetailSection("Clusters", clusterContent, styles.ColorBorderSubtle)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
-		box,
+		breadcrumb,
+		"",
+		card,
 		"",
 		clusterBox,
 	)

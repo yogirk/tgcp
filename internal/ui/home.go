@@ -31,14 +31,30 @@ func (m MainModel) View() string {
 	statusBar := m.StatusBar.View()
 
 	// Layout Content + Status Bar
-	// But first, let's just make the root content
 	screen := lipgloss.JoinVertical(lipgloss.Top, content, statusBar)
 
-	// 3. Overlays (Command Palette)
+	// 3. Toast Overlay (if active)
+	if m.Toast != nil && !m.Toast.IsExpired() {
+		toastView := m.Toast.View()
+		// Position toast at bottom-right, above status bar
+		screen = lipgloss.JoinVertical(lipgloss.Top,
+			content,
+			lipgloss.PlaceHorizontal(m.Width, lipgloss.Right, toastView),
+			statusBar,
+		)
+	}
+
+	// 4. Loading Spinner (if active) - show inline at top of content
+	if m.Spinner.IsActive() {
+		spinnerView := m.Spinner.View()
+		screen = lipgloss.JoinVertical(lipgloss.Top, spinnerView, content, statusBar)
+	}
+
+	// 5. Overlays (Command Palette)
 	if m.Navigation.PaletteActive {
 		// Overlay Palette on top of the entire screen
 		// Note: Palette.Render uses lipgloss.Place to center itself in the given dimensions
-		paletteView := m.Palette.Render(m.Navigation, m.Height, GetBanner())
+		paletteView := m.Palette.Render(m.Navigation, m.Width, m.Height, GetBanner())
 
 		// To truly "overlay" in TUI without clearing background is hard with just string concatenation.
 		// However, lipgloss.Place will fill the screen with whitespace if we aren't careful.
@@ -69,52 +85,14 @@ func renderLandingPage(m MainModel) string {
 		m.AuthState.UserEmail,
 		m.AuthState.ProjectID,
 	)
-	infoBox := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorSecondary).
-		Padding(1).
+	infoBox := styles.PrimaryBoxStyle.Copy().
 		Render(userInfo)
 
 	// Menu
 	menu := m.HomeMenu.View()
 
-	// Navigation Hints
-	col1 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Global"),
-		"q      Quit / Back",
-		"?      Toggle Help",
-		":      Cmd Palette",
-		"/      Filter List",
-	)
-
-	col2 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Navigation"),
-		"↑/↓    Move Cursor",
-		"← / →  Focus Panes",
-		"Enter  Select / Detail",
-		"Tab    Toggle Sidebar",
-		"Esc    Go Back",
-	)
-
-	col3 := lipgloss.JoinVertical(lipgloss.Left,
-		styles.SubtleStyle.Render("Actions"),
-		"r      Refresh Data",
-		"s      Start Resource",
-		"x      Stop Resource",
-		"h      SSH Connect",
-	)
-
-	hints := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorSecondary).
-		Padding(1, 2).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top,
-			col1,
-			"    ", // spacer
-			col2,
-			"    ", // spacer
-			col3,
-		))
+	// Minimal navigation hint
+	hints := styles.SubtleStyle.Render("↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette")
 
 	// Layout: Center everything
 	// We use lipgloss.Place to center vertically and horizontally

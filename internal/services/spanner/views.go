@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.instances) == 0 {
-		return components.RenderSpinner("Loading Spanner Instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Spanner", "Instances")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -23,6 +24,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -35,14 +42,11 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if i.State != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🌍 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Instance: %s", i.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+		i.Name,
 	)
 
 	capacity := fmt.Sprintf("%d Nodes", i.NodeCount)
@@ -50,16 +54,15 @@ func (s *Service) renderDetailView() string {
 		capacity = fmt.Sprintf("%d Processing Units", i.ProcessingUnits)
 	}
 
-	details := fmt.Sprintf(
-		"Display Name: %s\nConfiguration: %s\nCapacity: %s\nState: %s",
-		i.DisplayName,
-		i.Config,
-		capacity,
-		i.State,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Instance Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: i.Name},
+			{Key: "Status", Value: components.RenderStatus(i.State)},
+			{Key: "Display Name", Value: i.DisplayName},
+			{Key: "Configuration", Value: i.Config},
+			{Key: "Capacity", Value: capacity},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.clusters) == 0 {
-		return components.RenderSpinner("Loading Dataproc Clusters (us-central1)...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Dataproc", "Clusters")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -23,6 +24,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Clusters",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -35,29 +42,25 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if c.Status != "RUNNING" {
-		statusColor = styles.ColorWarning
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🐘 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Cluster: %s", c.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Clusters",
+		c.Name,
 	)
 
 	workers := fmt.Sprintf("%d x %s", c.WorkerCount, c.WorkerMachine)
 
-	details := fmt.Sprintf(
-		"Status: %s\nDefault Region: %s\nZone: %s\n\nMaster: %s\nWorkers: %s",
-		c.Status,
-		DefaultRegion,
-		c.Zone,
-		c.MasterMachine,
-		workers,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Cluster Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: c.Name},
+			{Key: "Status", Value: components.RenderStatus(c.Status)},
+			{Key: "Region", Value: DefaultRegion},
+			{Key: "Zone", Value: c.Zone},
+			{Key: "Master", Value: c.MasterMachine},
+			{Key: "Workers", Value: workers},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }

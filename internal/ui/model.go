@@ -62,7 +62,9 @@ type MainModel struct {
 	Sidebar   components.SidebarModel
 	HomeMenu  components.HomeMenuModel // Added
 	StatusBar components.StatusBarModel
-	Palette   components.PaletteModel // Added
+	Palette   components.PaletteModel  // Added
+	Toast     *components.ToastModel   // Toast notification (nil when hidden)
+	Spinner   components.SpinnerModel  // Global loading spinner
 
 	// State
 	ViewMode      ViewMode // Added
@@ -72,7 +74,7 @@ type MainModel struct {
 	ActiveService string
 
 	// External Managers
-	ProjectManager *core.ProjectManager
+	ProjectManager  *core.ProjectManager
 	ServiceRegistry *core.ServiceRegistry
 }
 
@@ -102,6 +104,7 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		HomeMenu:        components.NewHomeMenu(),
 		StatusBar:       statusBar,
 		Palette:         components.NewPalette(),
+		Spinner:         components.NewSpinner(),
 		Focus:           FocusSidebar,
 		ViewMode:        ViewHome,
 		ServiceMap:      svcMap,
@@ -159,6 +162,42 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.syncStatusBarFocus()
 
 	switch msg := msg.(type) {
+	// Toast Notifications
+	case core.ToastMsg:
+		m.Toast = components.NewToastFromMsg(msg)
+		return m, m.Toast.DismissCmd()
+
+	case components.ToastDismissMsg:
+		m.Toast = nil
+		return m, nil
+
+	// Loading Spinner
+	case core.LoadingMsg:
+		if msg.IsLoading {
+			cmd = m.Spinner.Start(msg.Message)
+			return m, cmd
+		} else {
+			m.Spinner.Stop()
+			return m, nil
+		}
+
+	case components.SpinnerTickMsg:
+		var cmds []tea.Cmd
+		// Update main model spinner
+		m.Spinner, cmd = m.Spinner.Update(msg)
+		cmds = append(cmds, cmd)
+		// Also forward to current service for its own spinner animation
+		if m.ViewMode == ViewService && m.CurrentSvc != nil {
+			var newModel tea.Model
+			newModel, cmd = m.CurrentSvc.Update(msg)
+			if updatedSvc, ok := newModel.(services.Service); ok {
+				m.CurrentSvc = updatedSvc
+				m.ServiceMap[m.CurrentSvc.ShortName()] = updatedSvc
+			}
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
+
 	// Status Bar Updates
 	case core.StatusMsg:
 		m.StatusBar.Message = msg.Message
@@ -343,10 +382,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// HOME MODE
 		if m.ViewMode == ViewHome && !m.ShowHelp && m.Focus != FocusPalette {
 			switch msg.String() {
-			case "enter":
+			case "enter", " ":
+				// If on category header, toggle it
+				if m.HomeMenu.IsOnCategory() {
+					m.HomeMenu.ToggleCurrentCategory()
+					return m, nil
+				}
 				// Select service
 				selected := m.HomeMenu.SelectedItem()
-				if !selected.IsComing { // Only allow entering implemented services
+				if selected.ShortName != "" && !selected.IsComing { // Only allow entering implemented services
 					m.ViewMode = ViewService
 					m.ActiveService = selected.ShortName
 

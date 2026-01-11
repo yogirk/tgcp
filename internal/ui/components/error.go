@@ -74,7 +74,7 @@ func (m ErrorModel) View() string {
 	}
 
 	// Help text
-	helpText := styles.HelpStyle.Render("[r] Retry  [q] Back")
+	helpText := RenderFooterHint("r Retry | q Back")
 
 	// Combine all parts
 	content := lipgloss.JoinVertical(

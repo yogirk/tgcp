@@ -1,30 +1,48 @@
+// =============================================================================
+// SERVICE TEMPLATE - Copy this file to create a new GCP service
+// =============================================================================
+//
+// REGISTRATION CHECKLIST (all 4 required):
+// -----------------------------------------
+// 1. Register in internal/ui/model.go → registerAllServices()
+//    registry.Register("myservice", func(cache *core.Cache) services.Service {
+//        return myservice.NewService(cache)
+//    })
+//
+// 2. Add to internal/ui/components/home_menu.go → appropriate category
+//
+// 3. Add to internal/ui/components/sidebar.go → Items list (maintain category order)
+//
+// 4. Update groupBreaks map in sidebar.go if adding to a new category position
+//
+// =============================================================================
+
 package template_service
 
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 30 * time.Second
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Models
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 // ExampleItem represents a resource managed by this service
 type ExampleItem struct {
 	Name   string
 	Status string
 	ID     string
+	Region string
 }
 
 // Tick message for background refresh
@@ -37,50 +55,73 @@ const (
 	ViewList ViewState = iota
 	ViewDetail
 	ViewConfirmation
+	// For services with tabs (e.g., Pub/Sub Topics/Subs, Cloud Run Services/Jobs):
+	// ViewListPrimary   // e.g., Topics, Services
+	// ViewListSecondary // e.g., Subscriptions, Jobs
 )
 
-// Msg types
+// Message types for async operations
 type dataMsg []ExampleItem
 type errMsg error
-type actionResultMsg struct{ err error }
+type actionResultMsg struct {
+	action string // "start", "stop", etc.
+	name   string // resource name for toast
+	err    error
+}
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Service Definition
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 // Service implements the services.Service interface
 type Service struct {
-	client    *Client // Your API Client
+	client    *Client
 	projectID string
-	table     *components.StandardTable
+
+	// Dimensions (for custom layouts)
+	width  int
+	height int
 
 	// UI Components
+	table         *components.StandardTable
 	filter        components.FilterModel
 	filterSession components.FilterSession[ExampleItem]
+	spinner       components.SpinnerModel
 
-	// State
+	// Data State
 	items   []ExampleItem
-	loading bool
 	err     error
+	loaded  bool // Track if initial data has been loaded
 
 	// View State
 	viewState    ViewState
 	selectedItem *ExampleItem
 
 	// Confirmation State
-	pendingAction string    // e.g. "start", "stop"
-	actionSource  ViewState // Where to return after confirmation
+	pendingAction string
+	actionSource  ViewState
 
 	// Cache
 	cache *core.Cache
 }
 
+// Placeholder Client type - replace with actual GCP client
+type Client struct{}
+
+func NewClient(ctx context.Context) (*Client, error) {
+	// Initialize your GCP client here
+	// Example:
+	// client, err := someapi.NewService(ctx)
+	// if err != nil { return nil, err }
+	return &Client{}, nil
+}
+
 // NewService creates a new instance of the service
 func NewService(cache *core.Cache) *Service {
-	// 1. Table Setup
 	columns := []table.Column{
 		{Title: "Name", Width: 30},
 		{Title: "Status", Width: 15},
+		{Title: "Region", Width: 15},
 		{Title: "ID", Width: 20},
 	}
 
@@ -89,8 +130,10 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter items..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
+		loaded:    false,
 	}
 	svc.filterSession = components.NewFilterSession(&svc.filter, svc.getFilteredItems, svc.updateTable)
 	return svc
@@ -101,336 +144,485 @@ func (s *Service) Name() string {
 	return "Template Service"
 }
 
-// ShortName returns the specialized identifier (e.g. "gce", "sql")
+// ShortName returns the identifier used for routing (e.g., "gce", "sql")
 func (s *Service) ShortName() string {
 	return "template"
 }
 
-// HelpText returns context-aware keybindings
+// HelpText returns context-aware keybindings for the status bar
 func (s *Service) HelpText() string {
-	if s.viewState == ViewList {
-		return "r:Refresh  /:Filter  Ent:Detail"
-	}
-	if s.viewState == ViewDetail {
-		return "Esc/q:Back"
-	}
-	if s.viewState == ViewConfirmation {
+	switch s.viewState {
+	case ViewList:
+		return "r:Refresh  /:Filter  Enter:Detail"
+	case ViewDetail:
+		return "s:Start  x:Stop  Esc/q:Back"
+	case ViewConfirmation:
 		return "y:Confirm  n:Cancel"
+	default:
+		return ""
 	}
-	return ""
 }
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Lifecycle & Interface Implementation
-// -----------------------------------------------------------------------------
+// =============================================================================
 
-// InitService initializes the API client
+// InitService initializes the API client - called once when service is first accessed
 func (s *Service) InitService(ctx context.Context, projectID string) error {
 	s.projectID = projectID
-	// Initialize your client here
-	// client, err := NewClient(ctx)
-	// if err != nil { return err }
-	// s.client = client
+	client, err := NewClient(ctx)
+	if err != nil {
+		return err
+	}
+	s.client = client
 	return nil
 }
 
-// Reinit reinitializes the service with a new project ID
+// Reinit reinitializes the service with a new project ID (on project switch)
 func (s *Service) Reinit(ctx context.Context, projectID string) error {
 	s.Reset()
+	s.loaded = false // Force reload on next entry
 	return s.InitService(ctx, projectID)
 }
 
-// Init startup commands (e.g. background tick)
+// Init returns startup commands (background tick)
 func (s *Service) Init() tea.Cmd {
 	return s.tick()
 }
 
-// tick creates a background ticker for cache invalidation
+// tick creates a background ticker for cache invalidation/refresh
 func (s *Service) tick() tea.Cmd {
 	return tea.Tick(CacheTTL, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-// Refresh triggers a forced data reload
+// Refresh triggers a forced data reload with spinner
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchDataCmd(true)
+	return tea.Batch(
+		s.spinner.Start(""), // Empty string = playful random messages
+		s.fetchDataCmd(true),
+	)
 }
 
-// Reset clears the service state when navigating away or switching projects
+// Reset clears the service state when navigating away
 func (s *Service) Reset() {
 	s.viewState = ViewList
 	s.selectedItem = nil
-	s.err = nil          // CRITICAL: Always clear errors on reset
-	s.table.SetCursor(0) // Reset table position
+	s.err = nil // CRITICAL: Always clear errors on reset
+	s.pendingAction = ""
+	s.table.SetCursor(0)
 	s.filter.ExitFilterMode()
 }
 
-// IsRootView returns true if we are at the top-level list
+// IsRootView returns true if at the top-level list (used for 'q' navigation)
 func (s *Service) IsRootView() bool {
 	return s.viewState == ViewList
 }
 
-// Focus handles input focus (Visual Highlight)
+// Focus handles input focus - triggers initial load if needed
 func (s *Service) Focus() {
 	s.table.Focus()
 }
 
-// Blur handles loss of input focus (Visual Dimming)
+// Blur handles loss of input focus
 func (s *Service) Blur() {
 	s.table.Blur()
 }
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Update Loop
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	// 1. Background Tick
+	// -------------------------------------------------------------------------
+	// SPINNER ANIMATION - Must be first for smooth animation
+	// -------------------------------------------------------------------------
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
+	// -------------------------------------------------------------------------
+	// BACKGROUND TICK - Cache refresh
+	// -------------------------------------------------------------------------
 	case tickMsg:
 		return s, tea.Batch(s.fetchDataCmd(false), s.tick())
 
-	// 2. Data Loaded
+	// -------------------------------------------------------------------------
+	// DATA LOADED
+	// -------------------------------------------------------------------------
 	case dataMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.items = msg
+		s.loaded = true
 		s.filterSession.Apply(s.items)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
-	// 3. Error Handling
+	// -------------------------------------------------------------------------
+	// ERROR HANDLING
+	// -------------------------------------------------------------------------
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
+	// -------------------------------------------------------------------------
+	// ACTION RESULT - Show toast notification
+	// -------------------------------------------------------------------------
 	case actionResultMsg:
+		s.spinner.Stop()
 		if msg.err != nil {
-			s.err = msg.err
+			return s, func() tea.Msg {
+				return core.ToastMsg{
+					Message: fmt.Sprintf("Failed to %s %s: %v", msg.action, msg.name, msg.err),
+					Type:    core.ToastError,
+				}
+			}
 		}
-		// Refresh after action
-		return s, s.Refresh()
+		// Success - show toast and refresh
+		return s, tea.Batch(
+			func() tea.Msg {
+				return core.ToastMsg{
+					Message: fmt.Sprintf("%s %s successfully", capitalize(msg.action), msg.name),
+					Type:    core.ToastSuccess,
+				}
+			},
+			s.Refresh(),
+		)
 
-	// 4. Window Resize
+	// -------------------------------------------------------------------------
+	// WINDOW RESIZE
+	// -------------------------------------------------------------------------
 	case tea.WindowSizeMsg:
+		s.width = msg.Width
+		s.height = msg.Height
 		s.table.HandleWindowSizeDefault(msg)
 
-	// 5. User Input
+	// -------------------------------------------------------------------------
+	// USER INPUT
+	// -------------------------------------------------------------------------
 	case tea.KeyMsg:
-		// Filter Pattern (Recommended)
-		if s.viewState == ViewList {
-			result := s.filterSession.HandleKey(msg)
+		return s.handleKeyMsg(msg)
+	}
 
-			if result.Handled {
-				if result.Cmd != nil {
-					return s, result.Cmd
-				}
-				if !result.ShouldContinue {
-					return s, nil
-				}
-				// Continue processing other keys
+	return s, nil
+}
+
+// handleKeyMsg processes keyboard input based on current view state
+func (s *Service) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	// -------------------------------------------------------------------------
+	// LIST VIEW
+	// -------------------------------------------------------------------------
+	if s.viewState == ViewList {
+		// Filter handling (must be first)
+		result := s.filterSession.HandleKey(msg)
+		if result.Handled {
+			if result.Cmd != nil {
+				return s, result.Cmd
 			}
-		}
-
-		// LIST VIEW KEYBINDINGS
-		if s.viewState == ViewList {
-			switch msg.String() {
-			case "r":
-				return s, s.Refresh()
-			case "enter":
-				// Handle selection
-				items := s.getCurrentItems()
-				if idx := s.table.Cursor(); idx >= 0 && idx < len(items) {
-					s.selectedItem = &items[idx]
-					s.viewState = ViewDetail
-				}
-			}
-			var updatedTable *components.StandardTable
-			updatedTable, cmd = s.table.Update(msg)
-			s.table = updatedTable
-			return s, cmd
-		}
-
-		// DETAIL VIEW KEYBINDINGS
-		if s.viewState == ViewDetail {
-			switch msg.String() {
-			case "esc", "q":
-				s.viewState = ViewList
-				s.selectedItem = nil
-				return s, nil
-				// Add action keys here
-			}
-		}
-
-		// CONFIRMATION VIEW KEYBINDINGS
-		if s.viewState == ViewConfirmation {
-			switch msg.String() {
-			case "y", "enter":
-				// Perform Action
-				// cmd = s.performActionCmd()
-				s.viewState = s.actionSource
-				s.pendingAction = ""
-				return s, cmd
-			case "n", "esc", "q":
-				s.viewState = s.actionSource
-				s.pendingAction = ""
+			if !result.ShouldContinue {
 				return s, nil
 			}
+		}
+
+		switch msg.String() {
+		case "r":
+			return s, s.Refresh()
+		case "enter":
+			items := s.getCurrentItems()
+			if idx := s.table.Cursor(); idx >= 0 && idx < len(items) {
+				s.selectedItem = &items[idx]
+				s.viewState = ViewDetail
+			}
+			return s, nil
+
+		// For services with tabs, add tab switching:
+		// case "tab", "[", "]":
+		//     if s.viewState == ViewListPrimary {
+		//         s.viewState = ViewListSecondary
+		//         s.secondaryFilterSession.Apply(s.secondaryItems)
+		//     } else {
+		//         s.viewState = ViewListPrimary
+		//         s.filterSession.Apply(s.items)
+		//     }
+		//     return s, nil
+		}
+
+		// Pass to table for navigation (j/k, up/down)
+		var updatedTable *components.StandardTable
+		updatedTable, cmd = s.table.Update(msg)
+		s.table = updatedTable
+		return s, cmd
+	}
+
+	// -------------------------------------------------------------------------
+	// DETAIL VIEW
+	// -------------------------------------------------------------------------
+	if s.viewState == ViewDetail {
+		switch msg.String() {
+		case "esc", "q":
+			s.viewState = ViewList
+			s.selectedItem = nil
+			return s, nil
+		case "s": // Start action
+			s.pendingAction = "start"
+			s.actionSource = ViewDetail
+			s.viewState = ViewConfirmation
+			return s, nil
+		case "x": // Stop action
+			s.pendingAction = "stop"
+			s.actionSource = ViewDetail
+			s.viewState = ViewConfirmation
+			return s, nil
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// CONFIRMATION VIEW
+	// -------------------------------------------------------------------------
+	if s.viewState == ViewConfirmation {
+		switch msg.String() {
+		case "y", "enter":
+			action := s.pendingAction
+			s.viewState = s.actionSource
+			s.pendingAction = ""
+			return s, s.performActionCmd(action)
+		case "n", "esc", "q":
+			s.viewState = s.actionSource
+			s.pendingAction = ""
+			return s, nil
 		}
 	}
 
 	return s, nil
 }
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // View Rendering
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 func (s *Service) View() string {
-	if s.loading && len(s.items) == 0 {
-		return components.RenderSpinner("Loading...")
-	}
+	// Error state
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Items")
 	}
 
-	if s.viewState == ViewDetail {
-		return s.renderDetailView()
+	// Loading state (spinner)
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
-	if s.viewState == ViewConfirmation {
-		// Use shared confirmation component
-		// Example: components.RenderConfirmation(s.pendingAction, s.selectedItem.Name, "item")
+
+	// Confirmation dialog
+	if s.viewState == ViewConfirmation && s.selectedItem != nil {
 		return components.RenderConfirmation(s.pendingAction, s.selectedItem.Name, "item")
 	}
 
-	// Default: List View
+	// Detail view
+	if s.viewState == ViewDetail {
+		return s.renderDetailView()
+	}
+
+	// Default: List view
 	return s.renderListView()
 }
 
 func (s *Service) renderListView() string {
-	return lipgloss.JoinVertical(lipgloss.Left, s.filter.View(), s.table.View())
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project: %s", s.projectID),
+		s.Name(),
+	)
+
+	// For services with tabs, show tab indicator:
+	// tabIndicator := s.renderTabBar() // "[Topics] Subscriptions" or "Topics [Subscriptions]"
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		breadcrumb,
+		s.filter.View(),
+		s.table.View(),
+	)
 }
 
-// -----------------------------------------------------------------------------
-// Helper Commands
-// -----------------------------------------------------------------------------
+func (s *Service) renderDetailView() string {
+	if s.selectedItem == nil {
+		return "Error: No item selected"
+	}
+
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project: %s", s.projectID),
+		s.Name(),
+		s.selectedItem.Name,
+	)
+
+	// DetailCard with auto-status detection
+	// Fields named "Status" or "State" are automatically rendered as badges
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Item Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: s.selectedItem.Name},
+			{Key: "Status", Value: s.selectedItem.Status}, // Auto-styled as badge
+			{Key: "Region", Value: s.selectedItem.Region},
+			{Key: "ID", Value: s.selectedItem.ID},
+		},
+	})
+
+	// Footer hints with consistent styling
+	actions := components.RenderFooterHint("s Start | x Stop | q Back")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		breadcrumb,
+		"",
+		card,
+		"",
+		actions,
+	)
+}
+
+// =============================================================================
+// Data Fetching
+// =============================================================================
 
 func (s *Service) fetchDataCmd(force bool) tea.Cmd {
 	return func() tea.Msg {
-		key := "template_data"
+		cacheKey := fmt.Sprintf("template_items:%s", s.projectID)
 
-		// 1. Check Cache
+		// Check cache first (unless forced refresh)
 		if !force && s.cache != nil {
-			if val, found := s.cache.Get(key); found {
+			if val, found := s.cache.Get(cacheKey); found {
 				if items, ok := val.([]ExampleItem); ok {
 					return dataMsg(items)
 				}
 			}
 		}
 
-		// 2. API Call (Simulated)
-		// if s.client == nil { return errMsg(fmt.Errorf("client not init")) }
-		// data, err := s.client.ListItems()
-		// if err != nil { return errMsg(err) }
-		data := []ExampleItem{} // Placeholder
-
-		// 3. Update Cache
-		if s.cache != nil {
-			s.cache.Set(key, data, CacheTTL)
+		// API call
+		if s.client == nil {
+			return errMsg(fmt.Errorf("client not initialized"))
 		}
 
-		return dataMsg(data)
+		// Replace with actual API call:
+		// items, err := s.client.ListItems(s.projectID)
+		// if err != nil {
+		//     return errMsg(err)
+		// }
+		items := []ExampleItem{} // Placeholder
+
+		// Update cache
+		if s.cache != nil {
+			s.cache.Set(cacheKey, items, CacheTTL)
+		}
+
+		return dataMsg(items)
 	}
 }
+
+// =============================================================================
+// Table Updates
+// =============================================================================
 
 func (s *Service) updateTable(items []ExampleItem) {
 	rows := make([]table.Row, len(items))
 	for i, item := range items {
-		rows[i] = table.Row{item.Name, item.Status, item.ID}
+		rows[i] = table.Row{
+			item.Name,
+			components.RenderStatus(item.Status), // Status badge styling
+			item.Region,
+			item.ID,
+		}
 	}
 	s.table.SetRows(rows)
 }
 
-// getCurrentItems returns the currently visible items (filtered if filter is active)
+// getCurrentItems returns items with current filter applied
 func (s *Service) getCurrentItems() []ExampleItem {
-	query := s.filter.Value()
-	if query == "" {
-		return s.items
-	}
-	return components.FilterSlice(s.items, query, func(item ExampleItem, q string) bool {
-		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
-	})
+	return s.getFilteredItems(s.items, s.filter.Value())
 }
 
-// getFilteredItems is used by HandleFilterUpdate - filters items based on query
+// getFilteredItems filters items based on query string
 func (s *Service) getFilteredItems(items []ExampleItem, query string) []ExampleItem {
 	if query == "" {
 		return items
 	}
 	return components.FilterSlice(items, query, func(item ExampleItem, q string) bool {
-		return components.ContainsMatch(item.Name, item.Status, item.ID)(q)
+		return components.ContainsMatch(item.Name, item.Status, item.Region, item.ID)(q)
 	})
 }
 
-// renderDetailView renders the detail view for a selected item
-// Example implementation:
-func (s *Service) renderDetailView() string {
-	if s.selectedItem == nil {
-		return "Error: No item selected"
+// =============================================================================
+// Actions
+// =============================================================================
+
+func (s *Service) performActionCmd(action string) tea.Cmd {
+	item := s.selectedItem
+	if item == nil {
+		return nil
 	}
 
-	// Use lipgloss for styling
-	title := styles.TitleStyle.Render(s.selectedItem.Name)
-
-	// Build detail content
-	var content strings.Builder
-	content.WriteString(title + "\n\n")
-	content.WriteString(fmt.Sprintf("Status: %s\n", s.selectedItem.Status))
-	content.WriteString(fmt.Sprintf("ID: %s\n", s.selectedItem.ID))
-
-	// Wrap in a styled box
-	return styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
-		Width(60).
-		Render(content.String())
-}
-
-// performActionCmd is an example of how to implement action commands
-// Example: Start/Stop actions
-func (s *Service) performActionCmd(action string) tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil {
-			return errMsg(fmt.Errorf("client not initialized"))
+			return actionResultMsg{action: action, name: item.Name, err: fmt.Errorf("client not initialized")}
 		}
 
-		// Example: Perform API call
-		// err := s.client.PerformAction(s.selectedItem.ID, action)
-		// if err != nil {
-		//     return actionResultMsg{err: err}
-		// }
+		var err error
+		switch action {
+		case "start":
+			// err = s.client.StartItem(s.projectID, item.ID)
+		case "stop":
+			// err = s.client.StopItem(s.projectID, item.ID)
+		default:
+			err = fmt.Errorf("unknown action: %s", action)
+		}
 
-		// Return success (no error)
-		return actionResultMsg{err: nil}
+		return actionResultMsg{action: action, name: item.Name, err: err}
 	}
 }
 
-// If your service needs multiple tables (e.g., buckets and objects):
-/*
-type Service struct {
-	// ... other fields ...
-	table      *components.StandardTable  // Main table
-	objectTable *components.StandardTable // Secondary table
+// =============================================================================
+// Helpers
+// =============================================================================
+
+func capitalize(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return string(s[0]-32) + s[1:] // Simple ASCII capitalize
 }
 
-func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		s.table.HandleWindowSizeDefault(msg)
-		s.objectTable.HandleWindowSizeDefault(msg) // Handle both tables
-	// ... rest of update logic
-	}
-}
-*/
+// =============================================================================
+// TABS PATTERN (Optional - for services with multiple resource types)
+// =============================================================================
+//
+// For services like Pub/Sub (Topics/Subscriptions) or Cloud Run (Services/Jobs),
+// add a second set of items and filter session:
+//
+// type Service struct {
+//     // ... existing fields ...
+//
+//     // Secondary items (e.g., Subscriptions, Jobs)
+//     secondaryItems         []SecondaryItem
+//     secondaryFilterSession components.FilterSession[SecondaryItem]
+// }
+//
+// Then in Update, handle tab switching:
+//
+// case "tab", "[", "]":
+//     if s.viewState == ViewListPrimary {
+//         s.viewState = ViewListSecondary
+//         s.updateSecondaryTable(s.secondaryItems)
+//     } else {
+//         s.viewState = ViewListPrimary
+//         s.updateTable(s.items)
+//     }
+//
+// In HelpText, show which tab is active:
+//
+// case ViewListPrimary:
+//     return "Tab:Switch to Subs  r:Refresh  /:Filter"
+// case ViewListSecondary:
+//     return "Tab:Switch to Topics  r:Refresh  /:Filter"
+//
+// =============================================================================

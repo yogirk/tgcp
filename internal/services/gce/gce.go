@@ -33,10 +33,10 @@ type Service struct {
 	// UI Components
 	filter        components.FilterModel
 	filterSession components.FilterSession[Instance]
+	spinner       components.SpinnerModel
 
 	// State
 	instances []Instance
-	loading   bool
 	err       error
 
 	// View State
@@ -60,6 +60,7 @@ func NewService(cache *core.Cache) *Service {
 	svc := &Service{
 		table:     t,
 		filter:    components.NewFilterWithPlaceholder("Filter instances..."),
+		spinner:   components.NewSpinner(),
 		viewState: ViewList,
 		cache:     cache,
 	}
@@ -135,35 +136,43 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		// Forward tick to spinner for animation
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		// Background refresh
-		// Only refresh if we are visible? Or always?
-		// For now, allow refresh.
-		// Use false to allow cache hit if multiple ticks stack up,
-		// but actually we want to force check validity or re-fetch?
-		// Actually tick means "TTL might be up".
-		// But our fetches set the Cache with TTL.
-		// If we call fetch(false), it will check cache. If cache expired, it fetches.
 		return s, tea.Batch(s.fetchInstancesCmd(false), s.tick())
 
 	// Handle Data Fetching
 	case instancesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.instances = msg
 		s.filterSession.Apply(s.instances)
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
+		return s, nil
 
 	case actionResultMsg:
 		if msg.err != nil {
 			s.err = msg.err
+			// Show error toast
+			return s, func() tea.Msg {
+				return core.ToastMsg{Message: msg.err.Error(), Type: core.ToastError}
+			}
+		} else if msg.msg != "" {
+			// Show success toast and refresh
+			return s, tea.Batch(
+				func() tea.Msg {
+					return core.ToastMsg{Message: msg.msg, Type: core.ToastSuccess}
+				},
+				s.Refresh(),
+			)
 		} else {
-			// Trigger refresh after action or just show status?
-			// For MVP, simple re-fetch after a delay might be nice,
-			// but let's just refresh now.
 			return s, s.Refresh()
 		}
 
@@ -296,11 +305,13 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the service UI
 func (s *Service) View() string {
-	if s.loading {
-		return components.RenderSpinner("Loading instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, s.Name(), "Instances")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -350,8 +361,10 @@ func (s *Service) fetchInstancesCmd(force bool) tea.Cmd {
 
 // Cmd to refresh (public)
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
-	return s.fetchInstancesCmd(false) // Smart refresh
+	return tea.Batch(
+		s.spinner.Start(""), // Start animated spinner (empty = use playful messages)
+		s.fetchInstancesCmd(false), // Smart refresh
+	)
 }
 
 // Reset resets the service state

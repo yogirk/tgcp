@@ -44,10 +44,73 @@ func (m ConfirmationModel) Update(msg tea.Msg) (ConfirmationModel, tea.Cmd) {
 	return m, nil
 }
 
+// actionStyle defines the visual styling for different action types
+type actionStyle struct {
+	icon        string
+	title       string
+	borderColor lipgloss.Color
+	titleStyle  lipgloss.Style
+	impactText  string // Optional warning text for dangerous actions
+}
+
+// getActionStyle returns the appropriate styling for an action type
+func getActionStyle(action string) actionStyle {
+	switch action {
+	case "delete", "remove", "destroy":
+		// Dangerous actions - red, strong warning
+		return actionStyle{
+			icon:        "⚠",
+			title:       "Confirm Deletion",
+			borderColor: styles.ColorError,
+			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorError).Bold(true),
+			impactText:  "This action cannot be undone.",
+		}
+	case "stop", "terminate", "shutdown":
+		// Disruptive actions - orange warning
+		return actionStyle{
+			icon:        "⏸",
+			title:       "Confirm Stop",
+			borderColor: styles.ColorWarning,
+			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorWarning).Bold(true),
+			impactText:  "",
+		}
+	case "start", "restart", "resume":
+		// Safe actions - blue/info
+		return actionStyle{
+			icon:        "▶",
+			title:       "Confirm Start",
+			borderColor: styles.ColorInfo,
+			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorInfo).Bold(true),
+			impactText:  "",
+		}
+	case "snapshot", "backup":
+		// Neutral actions - subtle
+		return actionStyle{
+			icon:        "📷",
+			title:       "Confirm Snapshot",
+			borderColor: styles.ColorBrandAccent,
+			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorBrandAccent).Bold(true),
+			impactText:  "",
+		}
+	default:
+		// Default - orange warning (current behavior)
+		return actionStyle{
+			icon:        "⚠",
+			title:       "Confirm Action",
+			borderColor: styles.ColorWarning,
+			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorWarning).Bold(true),
+			impactText:  "",
+		}
+	}
+}
+
 // View renders the confirmation dialog
 func (m ConfirmationModel) View() string {
-	// Title
-	title := styles.WarningStyle.Bold(true).Render("⚠ Confirm Action")
+	// Get action-specific styling
+	style := getActionStyle(m.Action)
+
+	// Title with icon
+	title := style.titleStyle.Render(style.icon + " " + style.title)
 
 	// Action text
 	var actionText string
@@ -58,22 +121,29 @@ func (m ConfirmationModel) View() string {
 	}
 
 	// Help text
-	helpText := styles.HelpStyle.Render("y (Confirm) / n (Cancel)")
+	helpText := RenderFooterHint("y Confirm | n Cancel")
+
+	// Build content parts
+	parts := []string{title, "", actionText}
+
+	// Add impact text for dangerous actions
+	if style.impactText != "" {
+		impactStyled := lipgloss.NewStyle().
+			Foreground(styles.ColorTextMuted).
+			Italic(true).
+			Render(style.impactText)
+		parts = append(parts, "", impactStyled)
+	}
+
+	parts = append(parts, "", helpText)
 
 	// Combine content
-	content := lipgloss.JoinVertical(
-		lipgloss.Center,
-		title,
-		"",
-		actionText,
-		"",
-		helpText,
-	)
+	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
 
-	// Wrap in styled box
+	// Wrap in styled box with action-specific border color
 	dialog := styles.BoxStyle.Copy().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorWarning).
+		BorderForeground(style.borderColor).
 		Padding(1, 4).
 		Width(70).
 		Render(content)

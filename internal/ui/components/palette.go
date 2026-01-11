@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,12 +13,11 @@ import (
 
 type PaletteModel struct {
 	TextInput textinput.Model
-	Width     int
 }
 
 func NewPalette() PaletteModel {
 	ti := textinput.New()
-	ti.Placeholder = "Type a command..."
+	ti.Placeholder = "Search services, actions..."
 	ti.Prompt = "➜ "
 	ti.CharLimit = 50
 	ti.Width = 40
@@ -38,15 +38,92 @@ func (m PaletteModel) Update(msg tea.Msg) (PaletteModel, tea.Cmd) {
 	return m, cmd
 }
 
+// highlightMatches renders text with matched characters highlighted
+// matchedIndexes are positions in the full "Name Description" string
+// We only highlight the name portion for cleaner display
+func highlightMatches(name, description string, matchedIndexes []int) (string, string) {
+	// Build a set of matched indexes for O(1) lookup
+	matchSet := make(map[int]bool)
+	for _, idx := range matchedIndexes {
+		matchSet[idx] = true
+	}
+
+	// Style for highlighted (matched) characters
+	highlightStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorBrandAccent).
+		Bold(true)
+
+	// Style for normal characters in name
+	nameStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorTextPrimary).
+		Bold(true)
+
+	// Build highlighted name
+	var nameBuilder strings.Builder
+	for i, r := range name {
+		char := string(r)
+		if matchSet[i] {
+			nameBuilder.WriteString(highlightStyle.Render(char))
+		} else {
+			nameBuilder.WriteString(nameStyle.Render(char))
+		}
+	}
+
+	// Description uses muted style, highlight matches there too
+	descStyle := styles.SubtleStyle
+	var descBuilder strings.Builder
+	nameLen := len(name) + 1 // +1 for the space between name and description
+
+	for i, r := range description {
+		char := string(r)
+		if matchSet[nameLen+i] {
+			descBuilder.WriteString(highlightStyle.Render(char))
+		} else {
+			descBuilder.WriteString(descStyle.Render(char))
+		}
+	}
+
+	return nameBuilder.String(), descBuilder.String()
+}
+
 // Render renders the palette overlay using the provided navigation state
-func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner string) string {
+func (m PaletteModel) Render(nav core.NavigationModel, screenWidth, screenHeight int, banner string) string {
+	if screenWidth <= 0 {
+		screenWidth = 80
+	}
+	if screenHeight <= 0 {
+		screenHeight = 24
+	}
+
+	boxWidth := screenWidth - 6
+	if boxWidth > 72 {
+		boxWidth = 72
+	}
+	if boxWidth < 40 {
+		boxWidth = 40
+	}
+
 	// 1. Input Box
-	// Using a "Search Bar" style (rounded, padded)
-	inputBoxStyle := styles.FocusedBoxStyle.Copy().
-		Width(60).
-		Padding(1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorHighlight) // Pink/Focus color
+	// Determine if we have a dropdown (suggestions or "no matches")
+	hasDropdown := len(nav.Suggestions) > 0 || m.TextInput.Value() != ""
+
+	// Build input box style - seamless with dropdown when present
+	var inputBoxStyle lipgloss.Style
+	if hasDropdown {
+		// No bottom border - connects seamlessly with dropdown
+		inputBoxStyle = lipgloss.NewStyle().
+			Width(boxWidth).
+			Padding(1).
+			Border(lipgloss.RoundedBorder(), true, true, false, true). // No bottom
+			BorderForeground(styles.ColorBrandAccent)
+	} else {
+		// Full border when no dropdown
+		inputBoxStyle = lipgloss.NewStyle().
+			Width(boxWidth).
+			Padding(1).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(styles.ColorBrandAccent)
+	}
 
 	inputView := inputBoxStyle.Render(m.TextInput.View())
 
@@ -54,27 +131,26 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 	var suggestionsView string
 	if len(nav.Suggestions) > 0 {
 		var lines []string
-		for i, cmd := range nav.Suggestions {
+		for i, match := range nav.Suggestions {
 			// Limit display to 8 items
 			if i >= 8 {
 				lines = append(lines, styles.SubtleStyle.Render(fmt.Sprintf("... and %d more", len(nav.Suggestions)-i)))
 				break
 			}
 
-			// Render Item
-			name := styles.LabelStyle.Render(cmd.Name)
-			desc := styles.ValueStyle.Render(cmd.Description)
+			// Render Item with highlighted matches
+			name, desc := highlightMatches(match.Name, match.Description, match.MatchedIndexes)
 
-			// Use simple logic for layout
-			// Name ........ Description
-			// Or just "Name - Description"
-
-			content := fmt.Sprintf("%-25s %s", name, desc)
+			// Layout: Name (padded) Description
+			// Use lipgloss width for proper padding with ANSI codes
+			nameWidth := 25
+			nameRendered := lipgloss.NewStyle().Width(nameWidth).Render(name)
+			content := nameRendered + " " + desc
 
 			if i == nav.Selection {
 				// Highlighted
 				content = styles.SelectedItemStyle.Copy().
-					Width(58). // Match box width approx (60 - padding)
+					Width(boxWidth - 2). // Match box width approx (padding)
 					Render(content)
 			} else {
 				// Normal
@@ -86,21 +162,23 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 		}
 		suggestionsView = lipgloss.JoinVertical(lipgloss.Left, lines...)
 
-		// Style the dropdown
+		// Style the dropdown - no top border, same accent color as input
 		suggestionsView = styles.BoxStyle.Copy().
-			Width(60).
+			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true). // No top border
-			BorderForeground(styles.ColorSubtext).
+			BorderForeground(styles.ColorBrandAccent).                 // Match input border color
 			Render(suggestionsView)
 	} else if m.TextInput.Value() != "" {
-		// No matches
+		// No matches - still connected to input
 		suggestionsView = styles.BoxStyle.Copy().
-			Width(60).
+			Width(boxWidth).
 			Border(lipgloss.RoundedBorder(), false, true, true, true).
-			BorderForeground(styles.ColorSubtext).
+			BorderForeground(styles.ColorBrandAccent). // Match input border color
 			Padding(0, 1).
 			Render(styles.SubtleStyle.Render("No matching commands"))
 	}
+
+	helpHint := styles.SubtleStyle.Render("Esc:Cancel  Enter:Run  ↑/↓:Select")
 
 	// 3. Combine: Banner -> Buffer -> Input -> List
 	// The banner is passed in.
@@ -110,10 +188,12 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenHeight int, banner 
 		"\n", // Spacer between banner and search bar
 		inputView,
 		suggestionsView,
+		"\n",
+		helpHint,
 	)
 
-	// 4. Center in Screen
-	return lipgloss.Place(m.Width, screenHeight,
+	// 4. Center in Screen without backdrop to avoid ghosting/shadows
+	return lipgloss.Place(screenWidth, screenHeight,
 		lipgloss.Center, lipgloss.Center,
 		ui,
 	)

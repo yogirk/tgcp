@@ -9,6 +9,7 @@ The following is a set of guidelines for contributing to TGCP. These are mostly 
 - **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Comprehensive guide for adding services, patterns, and debugging
 - **[Features Guide](FEATURES.md)** - Overview of all features
 - **[Codebase Review](CODEBASE_REVIEW.md)** - Architecture and design decisions
+- **[UI Patterns](docs/ui_patterns.md)** - Standard UI layout rules for lists and detail views
 
 ## Getting Started
 
@@ -72,6 +73,7 @@ Quick steps:
 
 - Use shared components: `components.RenderError()`, `components.RenderSpinner()`, `components.RenderConfirmation()`
 - Always use `StandardTable` for tables
+- Follow `docs/ui_patterns.md` for breadcrumbs, filters, and detail layout decisions
 - Implement proper caching with TTL
 - Handle errors gracefully
 - Keep UI responsive (use `tea.Cmd` for async operations)

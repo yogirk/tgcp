@@ -5,10 +5,20 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) renderServiceAccountsList() string {
-	return styles.BaseStyle.Render(s.table.View())
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Service Accounts",
+	)
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		breadcrumb,
+		s.table.View(),
+	)
 }
 
 func (s *Service) renderDetailView() string {
@@ -17,23 +27,29 @@ func (s *Service) renderDetailView() string {
 	}
 
 	// Breadcrumb
-	header := styles.SubtleStyle.Render(fmt.Sprintf("IAM > Service Accounts > %s", s.selectedAccount.DisplayName))
+	header := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Service Accounts",
+		s.selectedAccount.DisplayName,
+	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		"",
-		fmtKeyVal("Display Name", s.selectedAccount.DisplayName),
-		fmtKeyVal("Email", s.selectedAccount.Email),
-		fmtKeyVal("Unique ID", s.selectedAccount.UniqueID),
-		fmtKeyVal("Status", activeStatus(s.selectedAccount.Disabled)),
-		fmtKeyVal("Description", s.selectedAccount.Description),
+		components.DetailCard(components.DetailCardOpts{
+			Title: "Service Account Details",
+			Rows: []components.KeyValue{
+				{Key: "Display Name", Value: s.selectedAccount.DisplayName},
+				{Key: "Email", Value: s.selectedAccount.Email},
+				{Key: "Unique ID", Value: s.selectedAccount.UniqueID},
+				{Key: "Status", Value: activeStatus(s.selectedAccount.Disabled)},
+				{Key: "Description", Value: s.selectedAccount.Description},
+			},
+		}),
 	)
 
-	return styles.BoxStyle.Render(content)
-}
-
-func fmtKeyVal(key, val string) string {
-	return lipgloss.NewStyle().Bold(true).Render(key+": ") + val
+	return content
 }
 
 func activeStatus(disabled bool) string {

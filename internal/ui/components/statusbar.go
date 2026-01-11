@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,11 +22,11 @@ type StatusBarModel struct {
 
 func NewStatusBar() StatusBarModel {
 	return StatusBarModel{
-		Message:  "Ready",
-		Mode:     "NORMAL",
+		Message:   "Ready",
+		Mode:      "NORMAL",
 		FocusPane: "",
-		HelpText: "", // Dynamically set by view
-		Width:    80,
+		HelpText:  "", // Dynamically set by view
+		Width:     80,
 	}
 }
 
@@ -54,10 +53,15 @@ func (m StatusBarModel) Update(msg tea.Msg) (StatusBarModel, tea.Cmd) {
 }
 
 func (m StatusBarModel) View() string {
-	// Styles
+	// Separator character
+	sep := lipgloss.NewStyle().
+		Foreground(styles.ColorBorderSubtle).
+		Render(" │ ")
+
+	// Mode badge style
 	modeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("232")).
-		Background(styles.ColorSecondary). // Default
+		Background(styles.ColorBorderSubtle).
 		Bold(true).
 		Padding(0, 1)
 
@@ -66,47 +70,39 @@ func (m StatusBarModel) View() string {
 		modeStyle = modeStyle.Background(lipgloss.Color("196")) // Red
 		modeLabel = "ERROR"
 	} else if m.Mode == "COMMAND" {
-		modeStyle = modeStyle.Background(styles.ColorPrimary) // Pink
+		modeStyle = modeStyle.Background(styles.ColorBrandPrimary)
 	} else if m.Mode == "FILTER" {
-		modeStyle = modeStyle.Background(styles.ColorWarning) // Orange
+		modeStyle = modeStyle.Background(styles.ColorWarning)
 	} else if m.FocusPane == "MAIN" {
-		modeStyle = modeStyle.Background(styles.ColorAccent)
+		modeStyle = modeStyle.Background(styles.ColorBrandAccent)
 		modeLabel = m.FocusPane
 	} else if m.FocusPane == "SIDEBAR" || m.FocusPane == "HOME" {
-		modeStyle = modeStyle.Background(styles.ColorSecondary)
+		modeStyle = modeStyle.Background(styles.ColorBorderSubtle)
 		modeLabel = m.FocusPane
 	} else if m.Mode == "NORMAL" {
 		modeLabel = "NORMAL"
 	}
 
+	// Help hints style - format as [key] Action
 	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		Background(lipgloss.Color("237")).
-		Align(lipgloss.Right).
-		Padding(0, 1)
+		Foreground(styles.ColorTextMuted)
 
-	// Layout
-	// [ MODE ] [ Message .......................... ] [ Help ]
-
+	// Layout: ┃ MODE ┃ Message ............... │ Help Hints
 	mode := modeStyle.Render(modeLabel)
 
-	// Right side: Last Updated + Help
-	var rightSide string
-	if !m.LastUpdated.IsZero() {
-		since := time.Since(m.LastUpdated).Round(time.Second)
-		timeStr := fmt.Sprintf("Updated: %s ago", since)
-		rightSide = styles.SubtleStyle.Render(timeStr) + "  " + helpStyle.Render(m.HelpText)
-	} else {
-		rightSide = helpStyle.Render(m.HelpText)
+	// Right side: Help hints only (removed timestamp)
+	rightSide := ""
+	if m.HelpText != "" {
+		rightSide = sep + helpStyle.Render(m.HelpText)
 	}
 
 	// Calculate available width for message
-	infoWidth := m.Width - lipgloss.Width(mode) - lipgloss.Width(rightSide)
+	infoWidth := m.Width - lipgloss.Width(mode) - lipgloss.Width(rightSide) - 1
 	if infoWidth < 0 {
 		infoWidth = 0
 	}
 
 	info := styles.StatusBarStyle.Width(infoWidth).Render(m.Message)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, mode, info, rightSide)
+	return lipgloss.JoinHorizontal(lipgloss.Top, mode, " ", info, rightSide)
 }

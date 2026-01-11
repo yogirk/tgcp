@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 func (s *Service) View() string {
-	if s.loading && len(s.instances) == 0 {
-		return components.RenderSpinner("Loading Redis Instances...")
-	}
 	if s.err != nil {
 		return components.RenderError(s.err, "Redis", "Instances")
+	}
+
+	// Show spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	if s.viewState == ViewDetail {
@@ -23,6 +24,12 @@ func (s *Service) View() string {
 
 	// Filter Bar
 	var content strings.Builder
+	content.WriteString(components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+	))
+	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
 	content.WriteString(s.table.View())
@@ -35,30 +42,27 @@ func (s *Service) renderDetailView() string {
 		return ""
 	}
 
-	statusColor := styles.ColorSuccess
-	if i.State != "READY" {
-		statusColor = styles.ColorWarning
-	}
-
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.BaseStyle.Foreground(statusColor).Render("🧠 "),
-		styles.HeaderStyle.Render(fmt.Sprintf("Instance: %s", i.Name)),
+	breadcrumb := components.Breadcrumb(
+		fmt.Sprintf("Project %s", s.projectID),
+		s.Name(),
+		"Instances",
+		i.Name,
 	)
 
-	details := fmt.Sprintf(
-		"Display Name: %s\nLocation: %s\nTier: %s\nCapacity: %d GB\nVersion: %s\n\nHost: %s\nPort: %d\nNetwork: %s",
-		i.DisplayName,
-		i.Location,
-		i.Tier,
-		i.MemorySizeGb,
-		i.RedisVersion,
-		i.Host,
-		i.Port,
-		i.AuthorizedNetwork,
-	)
-
-	box := styles.BoxStyle.Copy().Width(80).Render(
-		lipgloss.JoinVertical(lipgloss.Left, header, " ", details),
-	)
-	return box
+	card := components.DetailCard(components.DetailCardOpts{
+		Title: "Instance Details",
+		Rows: []components.KeyValue{
+			{Key: "Name", Value: i.Name},
+			{Key: "Status", Value: components.RenderStatus(i.State)},
+			{Key: "Display Name", Value: i.DisplayName},
+			{Key: "Location", Value: i.Location},
+			{Key: "Tier", Value: i.Tier},
+			{Key: "Capacity", Value: fmt.Sprintf("%d GB", i.MemorySizeGb)},
+			{Key: "Version", Value: i.RedisVersion},
+			{Key: "Host", Value: i.Host},
+			{Key: "Port", Value: fmt.Sprintf("%d", i.Port)},
+			{Key: "Network", Value: i.AuthorizedNetwork},
+		},
+	})
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", card)
 }
