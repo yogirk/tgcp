@@ -1,0 +1,60 @@
+version: 2
+project_name: tgcp
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/tgcp
+    binary: tgcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+brews:
+  - repository:
+      owner: yogirk
+      name: homebrew-tgcp
+    homepage: "https://github.com/yogirk/tgcp"
+    description: "Terminal UI for Google Cloud Platform"
+    license: "MIT"
+    install: |
+      bin.install "tgcp"
+    test: |
+      system "#{bin}/tgcp", "--version"
+
+release:
+  github:
+    owner: yogirk
+    name: tgcp
+  draft: false
+  prerelease: auto

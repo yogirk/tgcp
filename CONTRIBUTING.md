@@ -7,8 +7,7 @@ The following is a set of guidelines for contributing to TGCP. These are mostly 
 ## Quick Links
 
 - **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Comprehensive guide for adding services, patterns, and debugging
-- **[Features Guide](FEATURES.md)** - Overview of all features
-- **[Codebase Review](CODEBASE_REVIEW.md)** - Architecture and design decisions
+- **[Features Guide](docs/FEATURES.md)** - Overview of all features
 - **[UI Patterns](docs/ui_patterns.md)** - Standard UI layout rules for lists and detail views
 
 ## Getting Started

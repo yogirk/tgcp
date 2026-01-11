@@ -13,11 +13,23 @@ import (
 	"github.com/yogirk/tgcp/internal/utils"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	// 1. Parse Flags
 	debug := flag.Bool("debug", false, "Enable debug logging")
 	project := flag.String("project", "", "Override Google Cloud project ID")
+	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("tgcp %s (commit: %s, built: %s)\n", version, commit, date)
+		os.Exit(0)
+	}
 
 	// 2. Initialize Logger
 	if *debug {

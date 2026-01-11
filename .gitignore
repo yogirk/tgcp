@@ -27,6 +27,3 @@ tgcp-debug
 debug.log
 .tgcp/
 
-# Issue tracking (local only)
-.beads/
-.aidocs/

@@ -2,7 +2,7 @@
 
 TGCP is a terminal-based user interface for observing and managing Google Cloud Platform resources, inspired by tools like K9s and TAWS. It provides a fast, keyboard-driven experience for DevOps engineers and Cloud Administrators.
 
-![alt text](image.png)
+![TGCP Terminal Interface](image.png)
 
 - **💡 Observability First**: Designed for reading statuses, logs, and configurations quickly.
 - **🚀 Fast Navigation**: Global vim-style keybindings (`j/k`, `Shift+H/L`).
@@ -16,8 +16,8 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
     - **Analytics**: Pub/Sub, Dataflow, Dataproc.
 - **🛡️ Safety**: Read-only by default for sensitive configs; confirmation dialogs for actions.
 - **📚 Documentation**:
-    - [Feature Deep Dive](docs/features.md)
-    - [Developer Guide](docs/developer_guide.md)
+    - [Feature Deep Dive](docs/FEATURES.md)
+    - [Developer Guide](docs/DEVELOPER_GUIDE.md)
     - [UI Patterns](docs/ui_patterns.md)
 
 ## Recommended Font
