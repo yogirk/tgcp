@@ -318,9 +318,10 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "l": // Logs
 				if s.activeTab == TabServices {
-					svcs := s.services
+					svcs := s.getFilteredServices(s.services, s.filter.Value())
 					if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
 						svc := svcs[idx]
+						// Strict quoting for filter
 						filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, svc.Name)
 						heading := fmt.Sprintf("Service: %s", svc.Name)
 						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "run", Heading: heading} }

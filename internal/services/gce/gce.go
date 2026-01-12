@@ -231,12 +231,12 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, s.SSHCmd(instances[idx])
 				}
 			case "l": // Logs
-				instances := s.getCurrentInstances()
+				instances := s.getFilteredInstances(s.instances, s.filter.Value())
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(instances) {
 					inst := instances[idx]
-					// Cloud SQL filter uses database_id usually project:instance
+					// Filter for GCE instance logs with Strict Quoting
 					filter := fmt.Sprintf(`resource.type="gce_instance" AND resource.labels.instance_id="%s"`, inst.ID)
-					heading := fmt.Sprintf("VM Instance: %s", inst.Name)
+					heading := fmt.Sprintf("VM Instance: %s (ID: %s)", inst.Name, inst.ID)
 					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gce", Heading: heading} }
 				}
 			}

@@ -1,19 +1,21 @@
 package logging
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 // View renders the service UI
 func (s *Service) View() string {
-	if s.loading {
-		return "Loading logs..."
-	}
 	if s.err != nil {
-		return fmt.Sprintf("Error: %v", s.err)
+		return components.RenderError(s.err, s.Name(), "Logs")
+	}
+
+	// Show animated spinner while loading
+	if s.spinner.IsActive() {
+		return s.spinner.View()
 	}
 
 	// Default: List View
@@ -24,37 +26,32 @@ func (s *Service) View() string {
 func (s *Service) renderListView() string {
 	doc := strings.Builder{}
 
-	// Heading
+	// Breadcrumb
+	var crumbItems []string
 	if s.heading != "" {
-		header := styles.TitleStyle.Copy().
-			Foreground(styles.ColorPrimary).
-			Bold(true).
-			MarginBottom(1).
-			Render(s.heading)
-		doc.WriteString(header)
-		doc.WriteString("\n")
+		crumbItems = []string{"Cloud Logging", s.heading}
+	} else {
+		crumbItems = []string{"Cloud Logging", "All Logs"}
 	}
+
+	// Debug: Show active filter in breadcrumb if set via text input
+	if filterVal := s.filter.TextInput.Value(); filterVal != "" {
+		// Truncate if too long (e.g. standard gce filter)
+		displayFilter := filterVal
+		if len(displayFilter) > 50 {
+			displayFilter = "Filter: " + displayFilter[:47] + "..."
+		} else {
+			displayFilter = "Filter: " + displayFilter
+		}
+		crumbItems = append(crumbItems, displayFilter)
+	}
+
+	doc.WriteString(components.Breadcrumb(crumbItems...))
+	doc.WriteString("\n\n")
 
 	// Filter Bar
 	// Always show filter bar for logging as it is crucial
-	if s.filtering {
-		doc.WriteString(s.filterInput.View())
-	} else {
-		// Render as wrapped text for better visibility when not editing
-		filterVal := s.filterInput.Value()
-		if filterVal == "" {
-			filterVal = s.filterInput.Placeholder
-		} else {
-			// Add prompt for consistency
-			filterVal = "/ " + filterVal
-		}
-		// Use a style that mimics input but wraps
-		style := styles.BaseStyle.Copy().
-			Width(s.viewport.Width - 4). // Match viewport wrapping
-			Foreground(styles.ColorSubtext)
-		
-		doc.WriteString(style.Render(filterVal))
-	}
+	doc.WriteString(s.filter.View())
 	doc.WriteString("\n")
 
 	doc.WriteString(styles.BaseStyle.Render(s.viewport.View()))
@@ -73,3 +70,4 @@ func renderSeverity(severity string) string {
 		return severity
 	}
 }
+

@@ -3,16 +3,15 @@ package logging
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"strings"
-
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rk/tgcp/internal/core"
-	"github.com/rk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/styles"
+	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
 const CacheTTL = 10 * time.Second // Logs change frequently
@@ -27,12 +26,11 @@ type Service struct {
 	viewport  viewport.Model
 
 	// UI Components
-	filterInput textinput.Model
-	filtering   bool
+	filter  components.FilterModel
+	spinner components.SpinnerModel
 
 	// State
-	entries []LogEntry
-	loading       bool
+	entries       []LogEntry
 	err           error
 	nextPageToken string
 	currentToken  string   // Token used for current page
@@ -47,25 +45,18 @@ type Service struct {
 }
 
 func NewService(cache *core.Cache) *Service {
-	// Table Setup
 	// Viewport Setup
 	vp := viewport.New(0, 0)
 	vp.Style = lipgloss.NewStyle().
 		PaddingRight(0)
 
-	// Filter Input Setup
-	ti := textinput.New()
-	ti.Placeholder = "Filter (e.g. severity>=ERROR)"
-	ti.Prompt = "/ "
-	ti.CharLimit = 1000
-	ti.Width = 60 // Initial default
-	ti.SetValue("") // Default to empty (triggers last 30m in api.go)
-
 	s := &Service{
-		viewport:    vp,
-		filterInput: ti,
-		cache:       cache,
+		viewport: vp,
+		filter:   components.NewFilterWithPlaceholder("Filter (e.g. severity>=ERROR)"),
+		spinner:  components.NewSpinner(),
+		cache:    cache,
 	}
+	s.filter.TextInput.CharLimit = 1000 // Allow long filters
 	return s
 }
 
@@ -78,34 +69,30 @@ func (s *Service) ShortName() string {
 }
 
 func (s *Service) HelpText() string {
-	if s.filtering {
+	if s.filter.IsActive() {
 		return "Esc:Cancel  Enter:Apply"
 	}
 	base := "r:Refresh  /:Filter  Esc/q:Back"
 	if s.returnTo != "" {
 		base = fmt.Sprintf("Esc:Back to %s  r:Refresh  /:Filter", s.returnTo)
 	}
-	if s.nextPageToken != "" {
-		base += "  n:Next"
-	}
 	if len(s.tokenStack) > 0 {
-		base += "  p:Prev"
+		base += "  n:Newer"
+	}
+	if s.nextPageToken != "" {
+		base += "  p:Older"
 	}
 	return base
 }
 
-
-
 // Focus handles input focus
 func (s *Service) Focus() {
-	// table was focused, nothing to do for viewport which always accepts keys if forwarded
-
+	// Viewport always active
 }
 
 // Blur handles loss of input focus
 func (s *Service) Blur() {
-	// table blur logic removed
-
+	s.filter.TextInput.Blur()
 }
 
 // Msg types
@@ -123,11 +110,13 @@ func (s *Service) InitService(ctx context.Context, projectID string) error {
 		return err
 	}
 	s.client = client
-	
-	// Initial fetch
-	// We return nil here as this is synchronous init called by app
-	// The actual fetch happens via Refresh/Init command usually
 	return nil
+}
+
+// Reinit reinitializes the service with a new project ID
+func (s *Service) Reinit(ctx context.Context, projectID string) error {
+	s.Reset()
+	return s.InitService(ctx, projectID)
 }
 
 // Init satisfies tea.Model interface, starts background tick
@@ -149,12 +138,16 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
+
 	case tickMsg:
 		// Background refresh always fetches page 1 (empty token) to see latest
 		return s, tea.Batch(s.fetchEntriesCmd(""), s.tick())
 
 	case entriesMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.entries = msg.entries
 		s.nextPageToken = msg.nextToken
 		// Current token is already set before fetch
@@ -162,7 +155,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
-		s.loading = false
+		s.spinner.Stop()
 		s.err = msg
 
 	case tea.WindowSizeMsg:
@@ -173,75 +166,74 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		s.viewport.Width = msg.Width
 		s.viewport.Height = newHeight
-		s.filterInput.Width = msg.Width - 4 // Dynamic filter width
-		s.renderLogs() // Re-render triggers wrapping
-
+		s.filter.TextInput.Width = msg.Width - 4 // Dynamic filter width
+		s.renderLogs()                           // Re-render triggers wrapping
 
 	case tea.KeyMsg:
-		// FILTERING MODE
-		if s.filtering {
+		// FILTERING MODE delegated to component
+		// Only check global keys if NOT filtering
+		if !s.filter.IsActive() {
 			switch msg.String() {
-			case "esc":
+			case "/":
+				return s, s.filter.EnterFilterMode()
+			case "r":
+				return s, s.Refresh()
+
+			case "p": // Previous / Older (Fetch next API page)
+				if s.nextPageToken != "" {
+					s.spinner.Start("")
+					// Push current token to stack (which represents state of "newer" page)
+					s.tokenStack = append(s.tokenStack, s.currentToken)
+					// Update current token
+					s.currentToken = s.nextPageToken
+					return s, s.fetchEntriesCmd(s.currentToken)
+				}
+			case "n": // Next / Newer (Pop stack)
+				if len(s.tokenStack) > 0 {
+					s.spinner.Start("")
+					// Pop last token
+					lastIdx := len(s.tokenStack) - 1
+					prevToken := s.tokenStack[lastIdx]
+					s.tokenStack = s.tokenStack[:lastIdx]
+
+					// Update current token
+					s.currentToken = prevToken
+					return s, s.fetchEntriesCmd(s.currentToken)
+				}
+			case "esc", "q":
 				if s.returnTo != "" {
 					dest := s.returnTo
 					s.returnTo = "" // Reset
 					return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
 				}
-				s.filtering = false
-				s.filterInput.Blur()
-				// Revert to valid filter or keep?
-				// s.filterInput.Reset() 
+				// Default behavior for Help bubbling?
 				return s, nil
-			case "enter":
-				s.filtering = false
-				s.filterInput.Blur()
-				return s, s.Refresh() // Apply filter
 			}
-
-			var inputCmd tea.Cmd
-			s.filterInput, inputCmd = s.filterInput.Update(msg)
-			return s, inputCmd
 		}
 
-		// LIST VIEW
-		switch msg.String() {
-		case "/":
-			s.filtering = true
-			s.filterInput.Focus()
-			return s, textinput.Blink
-		case "r":
-			return s, s.Refresh()
-		case "n":
-			if s.nextPageToken != "" {
-				s.loading = true
-				// Push current token to stack
-				s.tokenStack = append(s.tokenStack, s.currentToken)
-				// Update current token
-				s.currentToken = s.nextPageToken
-				return s, s.fetchEntriesCmd(s.currentToken)
+		// Handle Filter Input
+		var filterCmd tea.Cmd
+		// We don't use FilterSession here because we have custom "Apply" logic (Refresh)
+		// So we handle filter keys manually or use the component's Update
+		s.filter, filterCmd = s.filter.Update(msg)
+		if s.filter.IsActive() {
+			// Check for Enter/Esc which might be handled by component or us
+			// Actually component handles value update, we check for Enter to trigger fetch
+			if msg.String() == "enter" {
+				s.filter.ExitFilterMode()
+				return s, s.Refresh()
 			}
-		case "p":
-			if len(s.tokenStack) > 0 {
-				s.loading = true
-				// Pop last token
-				lastIdx := len(s.tokenStack) - 1
-				prevToken := s.tokenStack[lastIdx]
-				s.tokenStack = s.tokenStack[:lastIdx]
-				
-				// Update current token
-				s.currentToken = prevToken
-				return s, s.fetchEntriesCmd(s.currentToken)
+			if msg.String() == "esc" {
+				s.filter.ExitFilterMode()
+				// Don't reset if just cancelling?
+				// But we did exit match
+				return s, nil
 			}
-		case "esc", "q":
-			if s.returnTo != "" {
-				dest := s.returnTo
-				s.returnTo = "" // Reset
-				return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
-			}
-			return s, nil // Let parent handle if no returnTo? Or just Consume?
-		}		
+			return s, filterCmd
+		}
+
 		s.viewport, cmd = s.viewport.Update(msg)
-		return s, cmd
+		return s, tea.Batch(cmd, filterCmd)
 	}
 
 	return s, cmd
@@ -249,11 +241,9 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // SetFilter sets the filter string (used by other components to jump to logs)
 func (s *Service) SetFilter(filter string) {
-	s.filterInput.SetValue(filter)
-	s.filterInput.SetCursor(0) // Scroll to start so user sees the beginning context
-	s.filtering = false // Just apply the filter, don't enter edit mode
-	// If we want to auto-apply, we might need to trigger refresh, but this is just setting state.
-	// The caller (SwitchToLogsMsg) calls Refresh() right after.
+	s.filter.TextInput.SetValue(filter)
+	s.filter.TextInput.SetCursor(0)
+	s.filter.ExitFilterModeKeepValue()
 }
 
 // SetReturnTo sets the service to return to when Esc is pressed
@@ -275,7 +265,7 @@ func (s *Service) renderLogs() {
 
 	// Define Styles
 	metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Grey for timestamp/location
-	msgStyle := lipgloss.NewStyle().Foreground(styles.ColorText)
+	msgStyle := lipgloss.NewStyle().Foreground(styles.ColorTextPrimary)
 
 	// Determine effective width for wrapping
 	// Viewport width might be 0 initially
@@ -304,9 +294,9 @@ func (s *Service) renderLogs() {
 		// We use lipgloss to wrap the payload to the viewport width
 		payload := e.Payload
 		wrapped := msgStyle.Width(wrapWidth).Render(payload)
-		
+
 		doc.WriteString(wrapped + "\n")
-		
+
 		// Separator
 		doc.WriteString(metaStyle.Render(strings.Repeat("-", wrapWidth)) + "\n")
 	}
@@ -314,16 +304,16 @@ func (s *Service) renderLogs() {
 	s.viewport.SetContent(doc.String())
 }
 
-
 func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil {
 			return errMsg(fmt.Errorf("client not initialized"))
 		}
 
-		filter := s.filterInput.Value()
+		// Use Value() from TextInput in FilterModel
+		filter := s.filter.TextInput.Value()
 		pageSize := 12 // Requested constraint
-		
+
 		entries, nextToken, err := s.client.ListEntries(context.Background(), filter, pageSize, token)
 		if err != nil {
 			return errMsg(err)
@@ -333,7 +323,7 @@ func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 }
 
 func (s *Service) Refresh() tea.Cmd {
-	s.loading = true
+	s.spinner.Start("")
 	// Refresh keeps current page? Or resets to top?
 	// Usually Refresh means "give me latest", which effectively means page 1
 	// If user wants to reload current page, that's different.
@@ -354,6 +344,3 @@ func (s *Service) Reset() {
 func (s *Service) IsRootView() bool {
 	return true
 }
-
-// updateTable removed
-

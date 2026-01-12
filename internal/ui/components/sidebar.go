@@ -24,7 +24,7 @@ type SidebarModel struct {
 	Height  int
 }
 
-// groupBreaks defines indices after which a visual gap appears (0-indexed)
+	// groupBreaks defines indices after which a visual gap appears (0-indexed)
 // This creates subtle spacing between service categories
 var groupBreaks = map[int]bool{
 	0:  true, // After Overview
@@ -32,7 +32,7 @@ var groupBreaks = map[int]bool{
 	5:  true, // After Storage (GCS, Disks)
 	10: true, // After Databases (Cloud SQL, Spanner, Bigtable, Memorystore, Firestore)
 	14: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
-	// Security & Networking is last, no break needed
+	16: true, // After Security & Networking (IAM, Networking)
 }
 
 func NewSidebar() SidebarModel {

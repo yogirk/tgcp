@@ -60,13 +60,9 @@ func (c *Client) ListEntries(
     pageToken string,
 ) ([]LogEntry, string, error) {
 
-    finalFilter := filter
-    if finalFilter == "" {
-        finalFilter = fmt.Sprintf(
-            "timestamp >= \"%s\"",
-            time.Now().Add(-30*time.Minute).Format(time.RFC3339),
-        )
-    }
+	// If no filter is provided, we default to NO filter, relying on OrderBy to get latest.
+	// Previously we forced timestamp >= 30m ago, which hid older "latest" logs.
+	finalFilter := filter
 
     // Prepare request
     req := c.service.Entries.List(&logging.ListLogEntriesRequest{
