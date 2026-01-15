@@ -20,6 +20,7 @@ import (
 	"github.com/yogirk/tgcp/internal/services/gcs"
 	"github.com/yogirk/tgcp/internal/services/gke"
 	"github.com/yogirk/tgcp/internal/services/iam"
+	"github.com/yogirk/tgcp/internal/services/logging"
 	"github.com/yogirk/tgcp/internal/services/net"
 	"github.com/yogirk/tgcp/internal/services/overview"
 	"github.com/yogirk/tgcp/internal/services/pubsub"
@@ -525,6 +526,119 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.StatusBar.Message = "Select a project to switch..."
 		return m, nil
 
+	case core.SwitchToLogsMsg:
+		// Switch to Logging Service
+		m.ViewMode = ViewService
+		m.ActiveService = "logs"
+		// Sync Sidebar
+		for i, item := range m.Sidebar.Items {
+			if item.ShortName == "logs" {
+				m.Sidebar.Cursor = i
+				break
+			}
+		}
+
+		svc, err := m.getOrInitializeService(context.Background(), "logs")
+		if err != nil {
+			cmds = append(cmds, func() tea.Msg {
+				return core.StatusMsg{Message: "Failed to initialize logging service: " + err.Error(), IsError: true}
+			})
+			// Still allow switching? m.CurrentSvc would be nil or stale.
+			// Better to alert user and not switch context if fatal?
+			// But getOrInitializeService returns original svc if it existed.
+		}
+
+		if svc != nil {
+			m.CurrentSvc = svc
+			m.ServiceMap["logs"] = svc // Ensure map is up to date
+
+			svc.Reset()
+			// Cast to Logging Service to set filter
+			// We need a way to pass filter. Is it exposed?
+			// The interface Service doesn't have SetFilter.
+			// We can use type assertion.
+			if logSvc, ok := svc.(interface{ SetFilter(string) }); ok {
+				logSvc.SetFilter(msg.Filter)
+			}
+			if logSvc, ok := svc.(interface{ SetReturnTo(string) }); ok {
+				logSvc.SetReturnTo(msg.Source)
+			}
+			if logSvc, ok := svc.(interface{ SetHeading(string) }); ok {
+				logSvc.SetHeading(msg.Heading)
+			}
+
+			svc.Focus()
+
+			// Sync Window Size
+			if m.Width > 0 && m.Height > 0 {
+				availWidth := m.Width
+				// We force sidebar visible below, so account for it now
+				availWidth -= m.Sidebar.Width
+
+				newModel, _ := svc.Update(tea.WindowSizeMsg{
+					Width:  availWidth,
+					Height: m.Height,
+				})
+				if updatedSvc, ok := newModel.(services.Service); ok {
+					svc = updatedSvc
+					m.ServiceMap["logs"] = svc
+					m.CurrentSvc = svc
+				}
+			}
+
+			// Trigger Refresh
+			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+		}
+		m.Focus = FocusMain
+		m.Sidebar.Active = false
+		m.Sidebar.Visible = true
+		return m, tea.Batch(cmds...)
+
+	case core.SwitchToServiceMsg:
+		// Switch to a specific service
+		m.ViewMode = ViewService
+		m.ActiveService = msg.Service
+		// Sync Sidebar
+		for i, item := range m.Sidebar.Items {
+			if item.ShortName == msg.Service {
+				m.Sidebar.Cursor = i
+				break
+			}
+		}
+
+		if svc, exists := m.ServiceMap[msg.Service]; exists {
+			svc.Reset()
+			svc.Blur() // Focus sidebar initially? or Focus service?
+			// If returning from logs, maybe focus service directly?
+			// Let's stick to standard flow: Focus Sidebar active.
+			// But if user pressed Esc in logs, they expect to be back in the list, possibly focused on list?
+			// For now, consistent behavior: Sidebar active.
+			m.CurrentSvc = svc
+
+			// Sync Window Size
+			if m.Width > 0 && m.Height > 0 {
+				availWidth := m.Width
+				if m.Sidebar.Visible {
+					availWidth -= m.Sidebar.Width
+				}
+				newModel, _ := svc.Update(tea.WindowSizeMsg{
+					Width:  availWidth, // Use available width
+					Height: m.Height,
+				})
+				if updatedSvc, ok := newModel.(services.Service); ok {
+					svc = updatedSvc
+					m.ServiceMap[msg.Service] = svc
+					m.CurrentSvc = svc
+				}
+			}
+
+			// Trigger Refresh?
+			cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+		}
+		m.Focus = FocusSidebar
+		m.Sidebar.Active = true
+		return m, tea.Batch(cmds...)
+
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
@@ -546,37 +660,43 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 		// Check for Sidebar Selection Changes
-		selectedSvc := m.Sidebar.SelectedService()
-		if selectedSvc.ShortName != "" && m.ActiveService != selectedSvc.ShortName {
-			m.ActiveService = selectedSvc.ShortName
-			// Get or initialize service lazily
-			svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
-			if err != nil {
-				cmds = append(cmds, func() tea.Msg {
-					return core.StatusMsg{Message: "Failed to initialize service: " + err.Error(), IsError: true}
-				})
-				m.CurrentSvc = nil
-			} else if svc != nil {
-				svc.Reset() // Reset state (fix Bug 2)
-
-				// Sync Window Size immediately so table renders correctly
-				if m.Width > 0 && m.Height > 0 {
-					newModel, _ := svc.Update(tea.WindowSizeMsg{
-						Width:  m.Width,
-						Height: m.Height,
+		if m.Sidebar.Active {
+			selectedSvc := m.Sidebar.SelectedService()
+			if selectedSvc.ShortName != "" && m.ActiveService != selectedSvc.ShortName {
+				m.ActiveService = selectedSvc.ShortName
+				// Get or initialize service lazily
+				svc, err := m.getOrInitializeService(context.Background(), m.ActiveService)
+				if err != nil {
+					cmds = append(cmds, func() tea.Msg {
+						return core.StatusMsg{Message: "Failed to initialize service: " + err.Error(), IsError: true}
 					})
-					if updatedSvc, ok := newModel.(services.Service); ok {
-						svc = updatedSvc
-						m.ServiceMap[m.ActiveService] = svc
-					}
-				}
+					m.CurrentSvc = nil
+				} else if svc != nil {
+					svc.Reset() // Reset state (fix Bug 2)
 
-				m.CurrentSvc = svc
-				m.setFocus(m.Focus)
-				// Trigger Refresh
-				cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
-			} else {
-				m.CurrentSvc = nil
+					// Sync Window Size immediately so table renders correctly
+					if m.Width > 0 && m.Height > 0 {
+						availWidth := m.Width
+						if m.Sidebar.Visible {
+							availWidth -= m.Sidebar.Width
+						}
+						newModel, _ := svc.Update(tea.WindowSizeMsg{
+							Width:  availWidth,
+							Height: m.Height,
+						})
+						if updatedSvc, ok := newModel.(services.Service); ok {
+							svc = updatedSvc
+							m.ServiceMap[m.ActiveService] = svc
+						}
+					}
+
+					m.CurrentSvc = svc
+					m.setFocus(m.Focus)
+					// Trigger Refresh
+					cmds = append(cmds, func() tea.Msg { return svc.Refresh()() })
+				} else {
+					m.CurrentSvc = nil
+				}
 			}
 		}
 
@@ -686,6 +806,9 @@ func registerAllServices(registry *core.ServiceRegistry) {
 	})
 	registry.Register("net", func(cache *core.Cache) services.Service {
 		return net.NewService(cache)
+	})
+	registry.Register("logs", func(cache *core.Cache) services.Service {
+		return logging.NewService(cache)
 	})
 }
 

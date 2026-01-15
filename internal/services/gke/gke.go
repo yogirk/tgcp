@@ -103,7 +103,7 @@ func (s *Service) ShortName() string {
 
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "r:Refresh  /:Filter  K:k9s  Ent:Detail"
+		return "r:Refresh  /:Filter  K:k9s  l:Logs  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
 		return "Esc/q:Back  K:k9s"
@@ -245,6 +245,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if idx := s.table.Cursor(); idx >= 0 && idx < len(clusters) {
 					c := clusters[idx]
 					return s, s.launchK9s(c)
+				}
+			case "l": // Logs
+				clusters := s.getFilteredClusters(s.clusters, s.filter.Value())
+				if idx := s.table.Cursor(); idx >= 0 && idx < len(clusters) {
+					c := clusters[idx]
+					// Filter for GKE Cluster logs
+					filter := fmt.Sprintf(`resource.type="k8s_cluster" AND resource.labels.cluster_name="%s" AND resource.labels.location="%s"`, c.Name, c.Location)
+					heading := fmt.Sprintf("Cluster: %s", c.Name)
+					return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "gke", Heading: heading} }
 				}
 			}
 			var updatedTable *components.StandardTable

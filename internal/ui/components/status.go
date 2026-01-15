@@ -65,6 +65,8 @@ var runningStates = map[string]bool{
 	"SUCCEEDED": true,
 	"HEALTHY":   true,
 	"ENABLED":   true,
+	"NOTICE":    true,
+	"INFO":      true,
 }
 
 // stoppedStates maps state strings to StatusStopped
@@ -97,6 +99,7 @@ var pendingStates = map[string]bool{
 	"JOB_STATE_QUEUED": true,
 	"DRAINING":         true,
 	"CANCELLING":       true,
+	"WARNING":          true,
 }
 
 // CategorizeStatus determines the StatusCategory for a given state string
