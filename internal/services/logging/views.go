@@ -61,13 +61,13 @@ func (s *Service) renderListView() string {
 func renderSeverity(severity string) string {
 	switch severity {
 	case "ERROR", "CRITICAL", "ALERT", "EMERGENCY":
-		return styles.ErrorStyle.Render("🔴 " + severity)
+		return components.RenderStatus("ERROR")
 	case "WARNING":
-		return styles.WarningStyle.Render("🟡 " + severity)
+		return components.RenderStatus(severity) // yellow
 	case "NOTICE", "INFO":
-		return styles.SuccessStyle.Render("🔵 " + severity)
+		return components.RenderStatus(severity) // green
 	default:
-		return severity
+		return components.RenderStatus(severity)
 	}
 }
 
