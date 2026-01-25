@@ -329,8 +329,6 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			var updatedTable *components.StandardTable
-			updatedTable, cmd = s.table.Update(msg)
-			s.table = updatedTable
 			if s.activeTab == TabServices {
 				updatedTable, cmd = s.table.Update(msg)
 				s.table = updatedTable

@@ -24,7 +24,7 @@ type SidebarModel struct {
 	Height  int
 }
 
-	// groupBreaks defines indices after which a visual gap appears (0-indexed)
+// groupBreaks defines indices after which a visual gap appears (0-indexed)
 // This creates subtle spacing between service categories
 var groupBreaks = map[int]bool{
 	0:  true, // After Overview
