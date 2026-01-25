@@ -78,10 +78,14 @@ type MainModel struct {
 	// External Managers
 	ProjectManager  *core.ProjectManager
 	ServiceRegistry *core.ServiceRegistry
+
+	// Version Info
+	Version    core.VersionInfo
+	UpdateInfo *core.UpdateInfo // nil until checked
 }
 
 // InitialModel returns the initial state of the application
-func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
+func InitialModel(authState core.AuthState, cfg *config.Config, version core.VersionInfo) MainModel {
 	// Initialize Cache
 	cache := core.NewCache()
 
@@ -112,12 +116,17 @@ func InitialModel(authState core.AuthState, cfg *config.Config) MainModel {
 		ServiceMap:      svcMap,
 		ProjectManager:  core.NewProjectManager(cache),
 		ServiceRegistry: registry,
+		Version:         version,
 	}
 }
 
 // Init initializes the bubbletea program
 func (m MainModel) Init() tea.Cmd {
-	return tea.EnableMouseCellMotion
+	// Start with mouse support and check for updates in background
+	return tea.Batch(
+		tea.EnableMouseCellMotion,
+		core.CheckForUpdates(m.Version.Version),
+	)
 }
 
 // getOrInitializeService gets a service from the map, initializing it lazily if needed
@@ -171,6 +180,11 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.ToastDismissMsg:
 		m.Toast = nil
+		return m, nil
+
+	// Version Update Check
+	case core.UpdateCheckedMsg:
+		m.UpdateInfo = &msg.UpdateInfo
 		return m, nil
 
 	// Loading Spinner
