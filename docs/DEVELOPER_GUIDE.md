@@ -56,8 +56,29 @@ To add a new GCP service (e.g., `Cloud Spanner`):
     }
     ```
 
-3.  **Register Service**:
-    Add your new service to the initialization list in `internal/ui/model.go`.
+3.  **Register Service** (4 locations required):
+
+    **a. Service Registry** (`internal/ui/model.go` → `registerAllServices()`):
+    ```go
+    registry.Register("spanner", func(cache *core.Cache) services.Service {
+        return spanner.NewService(cache)
+    })
+    ```
+
+    **b. Landing Screen** (`internal/ui/components/home_menu.go` → `NewHomeMenu()`):
+    Add to the appropriate category in the `Categories` slice:
+    ```go
+    {Name: "Spanner", ShortName: "spanner"},
+    ```
+    Categories: Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability
+
+    **c. Sidebar** (`internal/ui/components/sidebar.go` → `Items` slice):
+    Add in category order with a Unicode icon (see Icon Guidelines below):
+    ```go
+    {Name: "Spanner", ShortName: "spanner", Icon: "⬡"},
+    ```
+
+    **d. Group Breaks** (if needed): Update `groupBreaks` map in `sidebar.go` if adding to a new category position.
 
 ## UI Component System
 
@@ -90,6 +111,31 @@ Always use styles from `internal/styles/styles.go` instead of defining custom Li
 **Border Hierarchy:**
 -   `PrimaryBoxStyle`: Main content cards, modals (rounded border, accent color)
 -   `SecondaryBoxStyle`: Supporting content, hints (normal border, subtle grey)
+
+## Icon Guidelines
+
+### Sidebar Service Icons
+
+Service icons in the sidebar (`internal/ui/components/sidebar.go`) **must use Unicode symbols, NOT emojis**.
+
+**Allowed:** Unicode geometric shapes, arrows, and miscellaneous symbols:
+```
+◉ ⚙ ☸ ▷ ▤ ◔ ⛁ ⬡ ▦ ◇ ◲ ⊞ ⇢ ⎈ ⇌ ⚿ ✦ ⇄
+```
+
+**Not allowed:** Emojis (e.g., 🔐 🖥️ 💾)
+
+**Why:** Unicode symbols render consistently across terminals and themes, while emojis may vary in appearance, width, and color rendering. Sidebar icons should be monochromatic and uniform.
+
+**Finding icons:** Use Unicode blocks like:
+- Geometric Shapes (U+25A0–U+25FF): `◉ ◇ ◈ ▤ ▦ ◲`
+- Arrows (U+2190–U+21FF): `⇢ ⇌ ⇄`
+- Miscellaneous Symbols (U+2600–U+26FF): `⚙ ⚿ ⛁`
+- Miscellaneous Technical (U+2300–U+23FF): `⎈`
+
+### Dashboard/Content Icons
+
+Emojis are acceptable in dashboard content views (like `overview/views.go`) where visual distinction and color are beneficial. However, prefer consistency within each view.
 
 ## Coding Standards
 

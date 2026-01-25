@@ -9,9 +9,15 @@
 //        return myservice.NewService(cache)
 //    })
 //
-// 2. Add to internal/ui/components/home_menu.go → appropriate category
+// 2. Add to internal/ui/components/home_menu.go → NewHomeMenu() Categories
+//    - Find the appropriate category (Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability)
+//    - Add ServiceItem with Name (display name) and ShortName (must match registry key)
+//    - Example: {Name: "My Service", ShortName: "myservice"}
 //
-// 3. Add to internal/ui/components/sidebar.go → Items list (maintain category order)
+// 3. Add to internal/ui/components/sidebar.go → Items list
+//    - Maintain category order (see groupBreaks map for category positions)
+//    - Use Unicode symbol for Icon (NOT emoji) - see docs/DEVELOPER_GUIDE.md "Icon Guidelines"
+//    - Example: {Name: "My Service", ShortName: "myservice", Icon: "◆"}
 //
 // 4. Update groupBreaks map in sidebar.go if adding to a new category position
 //
