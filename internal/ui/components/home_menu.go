@@ -18,6 +18,10 @@ type HomeMenuModel struct {
 	Categories []Category
 	Cursor     int  // Index in the flattened visible list
 	IsFocused  bool
+
+	// Screen dimensions for mouse click calculations (set by parent)
+	ScreenWidth  int
+	ScreenHeight int
 }
 
 func NewHomeMenu() HomeMenuModel {
@@ -153,8 +157,73 @@ func (m HomeMenuModel) Update(msg tea.Msg) (HomeMenuModel, tea.Cmd) {
 				}
 			}
 		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			// Map click Y to visible item index
+			// The view has: box padding (1) + "Services" title (1) + blank line (1) + items
+			// Plus top-level item has a blank line after it
+			if idx := m.getItemIndexFromY(msg.Y, visibleItems); idx >= 0 {
+				m.Cursor = idx
+				// If clicking on a category, toggle it
+				if idx < len(visibleItems) && visibleItems[idx].isCategory {
+					m.Categories[visibleItems[idx].categoryIndex].Expanded = !m.Categories[visibleItems[idx].categoryIndex].Expanded
+				}
+			}
+		}
 	}
 	return m, nil
+}
+
+// getItemIndexFromY maps a screen Y coordinate to a visible item index
+// The menu box is centered on screen, so we calculate its position first
+func (m HomeMenuModel) getItemIndexFromY(screenY int, visibleItems []menuItem) int {
+	if m.ScreenHeight == 0 {
+		return -1 // Dimensions not set
+	}
+
+	// Calculate menu box dimensions
+	// Box content: padding(1) + title(1) + blank(1) + items + padding(1)
+	// Items: each item is 1 row, top item has extra blank after it
+	itemCount := len(visibleItems)
+	contentHeight := 3 + itemCount + 1 // header rows + items + top item's extra blank
+	for _, item := range visibleItems {
+		if item.isTopItem {
+			contentHeight++ // extra blank after top item
+			break
+		}
+	}
+
+	// Menu is vertically centered (approximately - there's banner and info box above)
+	// The landing page layout: banner + info + menu + hints, all centered
+	// For a rough estimate, assume menu starts around 40% down the screen
+	menuStartY := m.ScreenHeight * 2 / 5
+
+	// Calculate relative Y within the menu
+	relativeY := screenY - menuStartY
+
+	// Account for box padding (1 row) and title + blank (2 rows)
+	const headerOffset = 3 // padding + "Services" + blank line
+	contentY := relativeY - headerOffset
+
+	if contentY < 0 {
+		return -1 // Click above content
+	}
+
+	// Map content Y to item index
+	row := 0
+	for i, item := range visibleItems {
+		if contentY == row {
+			return i
+		}
+		row++
+		// Top item has extra blank line after it
+		if item.isTopItem {
+			row++
+		}
+	}
+
+	return -1
 }
 
 func (m HomeMenuModel) View() string {

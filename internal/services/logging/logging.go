@@ -176,6 +176,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Adjust message column to fill available width
 		s.adjustTableColumns()
 
+	case tea.MouseMsg:
+		// Forward mouse events to table for click selection
+		if !s.viewingDetail {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
+			return s, cmd
+		}
+
 	case tea.KeyMsg:
 		if s.viewingDetail {
 			switch msg.String() {

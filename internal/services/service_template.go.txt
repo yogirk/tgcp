@@ -308,6 +308,17 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.table.HandleWindowSizeDefault(msg)
 
 	// -------------------------------------------------------------------------
+	// MOUSE INPUT - Forward to table for click selection
+	// -------------------------------------------------------------------------
+	case tea.MouseMsg:
+		if s.viewState == ViewList {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
+			return s, cmd
+		}
+
+	// -------------------------------------------------------------------------
 	// USER INPUT
 	// -------------------------------------------------------------------------
 	case tea.KeyMsg:

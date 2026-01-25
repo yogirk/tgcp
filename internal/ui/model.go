@@ -647,6 +647,68 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		availableHeight := msg.Height - 1
 		m.Sidebar.Height = availableHeight
 		m.StatusBar.Width = msg.Width
+
+		// Update home menu with screen dimensions for mouse click calculations
+		m.HomeMenu.ScreenWidth = msg.Width
+		m.HomeMenu.ScreenHeight = msg.Height
+
+	case tea.MouseMsg:
+		// Handle mouse clicks for focus switching and selection
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if m.ViewMode == ViewService && m.Sidebar.Visible {
+				// Check if click is in sidebar region (left side)
+				if msg.X < m.Sidebar.Width {
+					// Click in sidebar - switch focus and forward event
+					m.setFocus(FocusSidebar)
+					m.Sidebar.Active = true
+					if m.CurrentSvc != nil {
+						m.CurrentSvc.Blur()
+					}
+					m.Sidebar, cmd = m.Sidebar.Update(msg)
+					cmds = append(cmds, cmd)
+				} else {
+					// Click in main content area
+					m.setFocus(FocusMain)
+					m.Sidebar.Active = false
+					if m.CurrentSvc != nil {
+						m.CurrentSvc.Focus()
+						// Adjust X coordinate to be relative to main content area
+						adjustedMsg := tea.MouseMsg{
+							X:      msg.X - m.Sidebar.Width,
+							Y:      msg.Y,
+							Type:   msg.Type,
+							Button: msg.Button,
+							Action: msg.Action,
+						}
+						newModel, svcCmd := m.CurrentSvc.Update(adjustedMsg)
+						if updatedSvc, ok := newModel.(services.Service); ok {
+							m.CurrentSvc = updatedSvc
+							m.ServiceMap[m.ActiveService] = updatedSvc
+						}
+						cmds = append(cmds, svcCmd)
+					}
+				}
+				return m, tea.Batch(cmds...)
+			} else if m.ViewMode == ViewHome {
+				// Forward to home menu - it handles its own click mapping
+				m.HomeMenu, cmd = m.HomeMenu.Update(msg)
+				cmds = append(cmds, cmd)
+				return m, tea.Batch(cmds...)
+			}
+		}
+		// For non-click mouse events (motion, scroll), forward to focused component
+		if m.ViewMode == ViewService {
+			if m.Focus == FocusSidebar {
+				m.Sidebar, cmd = m.Sidebar.Update(msg)
+				cmds = append(cmds, cmd)
+			} else if m.CurrentSvc != nil {
+				newModel, svcCmd := m.CurrentSvc.Update(msg)
+				if updatedSvc, ok := newModel.(services.Service); ok {
+					m.CurrentSvc = updatedSvc
+				}
+				cmds = append(cmds, svcCmd)
+			}
+		}
 	}
 
 	// Global Updates
