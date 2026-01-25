@@ -32,7 +32,8 @@ var groupBreaks = map[int]bool{
 	5:  true, // After Storage (GCS, Disks)
 	10: true, // After Databases (Cloud SQL, Spanner, Bigtable, Memorystore, Firestore)
 	14: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
-	16: true, // After Security & Networking (IAM, Networking)
+	17: true, // After Security & Networking (IAM, Secrets, Networking)
+	18: true, // After Observability (Cloud Logging)
 }
 
 func NewSidebar() SidebarModel {
@@ -60,7 +61,10 @@ func NewSidebar() SidebarModel {
 			{Name: "Pub/Sub", ShortName: "pubsub", Icon: "⇌"},
 			// Security & Networking
 			{Name: "IAM", ShortName: "iam", Icon: "⚿"},
+			{Name: "Secrets", ShortName: "secrets", Icon: "✦"},
 			{Name: "Networking", ShortName: "net", Icon: "⇄"},
+			// Observability
+			{Name: "Cloud Logging", ShortName: "logs", Icon: "☰"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start

@@ -68,7 +68,15 @@ func NewHomeMenu() HomeMenuModel {
 				Expanded: true,
 				Services: []ServiceItem{
 					{Name: "IAM & Admin", ShortName: "iam"},
+					{Name: "Secret Manager", ShortName: "secrets"},
 					{Name: "VPC Network", ShortName: "net"},
+				},
+			},
+			{
+				Name:     "Observability",
+				Expanded: true,
+				Services: []ServiceItem{
+					{Name: "Cloud Logging", ShortName: "logs"},
 				},
 			},
 		},

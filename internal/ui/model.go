@@ -25,6 +25,7 @@ import (
 	"github.com/yogirk/tgcp/internal/services/overview"
 	"github.com/yogirk/tgcp/internal/services/pubsub"
 	"github.com/yogirk/tgcp/internal/services/redis"
+	"github.com/yogirk/tgcp/internal/services/secrets"
 	"github.com/yogirk/tgcp/internal/services/spanner"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
@@ -809,6 +810,9 @@ func registerAllServices(registry *core.ServiceRegistry) {
 	})
 	registry.Register("logs", func(cache *core.Cache) services.Service {
 		return logging.NewService(cache)
+	})
+	registry.Register("secrets", func(cache *core.Cache) services.Service {
+		return secrets.NewService(cache)
 	})
 }
 

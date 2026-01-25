@@ -6,11 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/core"
-	"github.com/yogirk/tgcp/internal/styles"
 	"github.com/yogirk/tgcp/internal/ui/components"
 )
 
@@ -23,10 +21,9 @@ type tickMsg time.Time
 type Service struct {
 	client    *Client
 	projectID string
-	viewport  viewport.Model
 
 	// UI Components
-	filter  components.FilterModel
+	table   *components.StandardTable
 	spinner components.SpinnerModel
 
 	// State
@@ -36,27 +33,40 @@ type Service struct {
 	currentToken  string   // Token used for current page
 	tokenStack    []string // History of tokens for "Previous" function
 
+	// Dimensions
+	width  int
+	height int
+
 	// Cache
 	cache *core.Cache
 
 	// Navigation
 	returnTo string
 	heading  string
+
+	// Filter for API calls
+	filter string
+
+	// Detail view
+	selectedEntry *LogEntry
+	viewingDetail bool
 }
 
 func NewService(cache *core.Cache) *Service {
-	// Viewport Setup
-	vp := viewport.New(0, 0)
-	vp.Style = lipgloss.NewStyle().
-		PaddingRight(0)
+	// Compact table columns for log entries
+	columns := []table.Column{
+		{Title: "Time", Width: 19},
+		{Title: "Sev", Width: 8},
+		{Title: "Message", Width: 80},
+	}
+
+	t := components.NewStandardTable(columns)
 
 	s := &Service{
-		viewport: vp,
-		filter:   components.NewFilterWithPlaceholder("Filter (e.g. severity>=ERROR)"),
-		spinner:  components.NewSpinner(),
-		cache:    cache,
+		table:   t,
+		spinner: components.NewSpinner(),
+		cache:   cache,
 	}
-	s.filter.TextInput.CharLimit = 1000 // Allow long filters
 	return s
 }
 
@@ -69,12 +79,14 @@ func (s *Service) ShortName() string {
 }
 
 func (s *Service) HelpText() string {
-	if s.filter.IsActive() {
-		return "Esc:Cancel  Enter:Apply"
+	if s.viewingDetail {
+		return "Esc/q:Back"
 	}
-	base := "r:Refresh  /:Filter  Esc/q:Back"
+	base := "r:Refresh  Enter:Detail"
 	if s.returnTo != "" {
-		base = fmt.Sprintf("Esc:Back to %s  r:Refresh  /:Filter", s.returnTo)
+		base = fmt.Sprintf("Esc:Back to %s  r:Refresh  Enter:Detail", s.returnTo)
+	} else {
+		base += "  Esc/q:Back"
 	}
 	if len(s.tokenStack) > 0 {
 		base += "  n:Newer"
@@ -87,12 +99,12 @@ func (s *Service) HelpText() string {
 
 // Focus handles input focus
 func (s *Service) Focus() {
-	// Viewport always active
+	s.table.Focus()
 }
 
 // Blur handles loss of input focus
 func (s *Service) Blur() {
-	s.filter.TextInput.Blur()
+	s.table.Blur()
 }
 
 // Msg types
@@ -150,8 +162,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.spinner.Stop()
 		s.entries = msg.entries
 		s.nextPageToken = msg.nextToken
-		// Current token is already set before fetch
-		s.renderLogs()
+		s.updateTable()
 		return s, func() tea.Msg { return core.LastUpdatedMsg(time.Now()) }
 
 	case errMsg:
@@ -159,81 +170,69 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.err = msg
 
 	case tea.WindowSizeMsg:
-		const heightOffset = 6
-		newHeight := msg.Height - heightOffset
-		if newHeight < 5 {
-			newHeight = 5
-		}
-		s.viewport.Width = msg.Width
-		s.viewport.Height = newHeight
-		s.filter.TextInput.Width = msg.Width - 4 // Dynamic filter width
-		s.renderLogs()                           // Re-render triggers wrapping
+		s.width = msg.Width
+		s.height = msg.Height
+		s.table.HandleWindowSizeDefault(msg)
+		// Adjust message column to fill available width
+		s.adjustTableColumns()
 
 	case tea.KeyMsg:
-		// FILTERING MODE delegated to component
-		// Only check global keys if NOT filtering
-		if !s.filter.IsActive() {
+		if s.viewingDetail {
 			switch msg.String() {
-			case "/":
-				return s, s.filter.EnterFilterMode()
-			case "r":
-				return s, s.Refresh()
-
-			case "p": // Previous / Older (Fetch next API page)
-				if s.nextPageToken != "" {
-					s.spinner.Start("")
-					// Push current token to stack (which represents state of "newer" page)
-					s.tokenStack = append(s.tokenStack, s.currentToken)
-					// Update current token
-					s.currentToken = s.nextPageToken
-					return s, s.fetchEntriesCmd(s.currentToken)
-				}
-			case "n": // Next / Newer (Pop stack)
-				if len(s.tokenStack) > 0 {
-					s.spinner.Start("")
-					// Pop last token
-					lastIdx := len(s.tokenStack) - 1
-					prevToken := s.tokenStack[lastIdx]
-					s.tokenStack = s.tokenStack[:lastIdx]
-
-					// Update current token
-					s.currentToken = prevToken
-					return s, s.fetchEntriesCmd(s.currentToken)
-				}
 			case "esc", "q":
-				if s.returnTo != "" {
-					dest := s.returnTo
-					s.returnTo = "" // Reset
-					return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
-				}
-				// Default behavior for Help bubbling?
+				s.viewingDetail = false
+				s.selectedEntry = nil
 				return s, nil
 			}
+			return s, nil
 		}
 
-		// Handle Filter Input
-		var filterCmd tea.Cmd
-		// We don't use FilterSession here because we have custom "Apply" logic (Refresh)
-		// So we handle filter keys manually or use the component's Update
-		s.filter, filterCmd = s.filter.Update(msg)
-		if s.filter.IsActive() {
-			// Check for Enter/Esc which might be handled by component or us
-			// Actually component handles value update, we check for Enter to trigger fetch
-			if msg.String() == "enter" {
-				s.filter.ExitFilterMode()
-				return s, s.Refresh()
+		switch msg.String() {
+		case "r":
+			return s, s.Refresh()
+
+		case "enter":
+			if idx := s.table.Cursor(); idx >= 0 && idx < len(s.entries) {
+				s.selectedEntry = &s.entries[idx]
+				s.viewingDetail = true
 			}
-			if msg.String() == "esc" {
-				s.filter.ExitFilterMode()
-				// Don't reset if just cancelling?
-				// But we did exit match
-				return s, nil
+			return s, nil
+
+		case "p": // Previous / Older (Fetch next API page)
+			if s.nextPageToken != "" {
+				s.spinner.Start("")
+				// Push current token to stack (which represents state of "newer" page)
+				s.tokenStack = append(s.tokenStack, s.currentToken)
+				// Update current token
+				s.currentToken = s.nextPageToken
+				return s, s.fetchEntriesCmd(s.currentToken)
 			}
-			return s, filterCmd
+		case "n": // Next / Newer (Pop stack)
+			if len(s.tokenStack) > 0 {
+				s.spinner.Start("")
+				// Pop last token
+				lastIdx := len(s.tokenStack) - 1
+				prevToken := s.tokenStack[lastIdx]
+				s.tokenStack = s.tokenStack[:lastIdx]
+
+				// Update current token
+				s.currentToken = prevToken
+				return s, s.fetchEntriesCmd(s.currentToken)
+			}
+		case "esc", "q":
+			if s.returnTo != "" {
+				dest := s.returnTo
+				s.returnTo = "" // Reset
+				return s, func() tea.Msg { return core.SwitchToServiceMsg{Service: dest} }
+			}
+			return s, nil
 		}
 
-		s.viewport, cmd = s.viewport.Update(msg)
-		return s, tea.Batch(cmd, filterCmd)
+		// Pass to table for navigation
+		var updatedTable *components.StandardTable
+		updatedTable, cmd = s.table.Update(msg)
+		s.table = updatedTable
+		return s, cmd
 	}
 
 	return s, cmd
@@ -241,9 +240,7 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // SetFilter sets the filter string (used by other components to jump to logs)
 func (s *Service) SetFilter(filter string) {
-	s.filter.TextInput.SetValue(filter)
-	s.filter.TextInput.SetCursor(0)
-	s.filter.ExitFilterModeKeepValue()
+	s.filter = filter
 }
 
 // SetReturnTo sets the service to return to when Esc is pressed
@@ -251,57 +248,68 @@ func (s *Service) SetReturnTo(service string) {
 	s.returnTo = service
 }
 
-// SetHeading sets the custom heading and adjusts columns
+// SetHeading sets the custom heading
 func (s *Service) SetHeading(heading string) {
 	s.heading = heading
-	// Re-render handled by next update/fetch or we can force it if we had entries
-	if len(s.entries) > 0 {
-		s.renderLogs()
-	}
 }
 
-func (s *Service) renderLogs() {
-	doc := strings.Builder{}
-
-	// Define Styles
-	metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Grey for timestamp/location
-	msgStyle := lipgloss.NewStyle().Foreground(styles.ColorTextPrimary)
-
-	// Determine effective width for wrapping
-	// Viewport width might be 0 initially
-	wrapWidth := s.viewport.Width - 4
-	if wrapWidth < 20 {
-		wrapWidth = 60 // fallback
+func (s *Service) adjustTableColumns() {
+	// Calculate available width for message column
+	// Time=19, Sev=8, padding/borders ~6
+	msgWidth := s.width - 19 - 8 - 10
+	if msgWidth < 30 {
+		msgWidth = 30
+	}
+	if msgWidth > 120 {
+		msgWidth = 120
 	}
 
-	for _, e := range s.entries {
-		ts := e.Timestamp.Local().Format("2006-01-02 15:04:05")
-		sev := renderSeverity(e.Severity)
+	columns := []table.Column{
+		{Title: "Time", Width: 19},
+		{Title: "Sev", Width: 8},
+		{Title: "Message", Width: msgWidth},
+	}
+	s.table.SetColumns(columns)
+}
 
-		// Header Line: TIMESTAMP  SEVERITY  LOCATION
-		// Combine location info
-		loc := e.Location
-		if s.heading == "" {
-			if e.ResourceType != "" {
-				loc = fmt.Sprintf("%s %s %s", e.ResourceType, e.ResourceName, e.Location)
-			}
+func (s *Service) updateTable() {
+	rows := make([]table.Row, len(s.entries))
+	for i, e := range s.entries {
+		ts := e.Timestamp.Local().Format("01-02 15:04:05")
+		sev := formatSeverityShort(e.Severity)
+
+		// Truncate message for table display
+		msg := e.Payload
+		// Remove newlines for table display
+		msg = strings.ReplaceAll(msg, "\n", " ")
+		if len(msg) > 100 {
+			msg = msg[:97] + "..."
 		}
 
-		header := fmt.Sprintf("%s  %s  %s", ts, sev, loc)
-		doc.WriteString(metaStyle.Render(header) + "\n")
-
-		// Message Body (Wrapped)
-		// We use lipgloss to wrap the payload to the viewport width
-		payload := e.Payload
-		wrapped := msgStyle.Width(wrapWidth).Render(payload)
-
-		doc.WriteString(wrapped + "\n")
-
-		// Separator
-		doc.WriteString(metaStyle.Render(strings.Repeat("-", wrapWidth)) + "\n")
+		rows[i] = table.Row{ts, sev, msg}
 	}
+	s.table.SetRows(rows)
+}
 
-	s.viewport.SetContent(doc.String())
+func formatSeverityShort(severity string) string {
+	switch severity {
+	case "EMERGENCY":
+		return components.RenderStatus("EMERG")
+	case "CRITICAL":
+		return components.RenderStatus("CRIT")
+	case "ERROR":
+		return components.RenderStatus("ERROR")
+	case "WARNING":
+		return components.RenderStatus("WARN")
+	case "NOTICE":
+		return components.RenderStatus("NOTICE")
+	case "INFO":
+		return components.RenderStatus("INFO")
+	case "DEBUG":
+		return components.RenderStatus("DEBUG")
+	default:
+		return components.RenderStatus("DEFAULT")
+	}
 }
 
 func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
@@ -310,9 +318,9 @@ func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 			return errMsg(fmt.Errorf("client not initialized"))
 		}
 
-		// Use Value() from TextInput in FilterModel
-		filter := s.filter.TextInput.Value()
-		pageSize := 12 // Requested constraint
+		// Use the stored filter value
+		filter := s.filter
+		pageSize := 25 // More entries fit now with compact table format
 
 		entries, nextToken, err := s.client.ListEntries(context.Background(), filter, pageSize, token)
 		if err != nil {
@@ -324,10 +332,6 @@ func (s *Service) fetchEntriesCmd(token string) tea.Cmd {
 
 func (s *Service) Refresh() tea.Cmd {
 	s.spinner.Start("")
-	// Refresh keeps current page? Or resets to top?
-	// Usually Refresh means "give me latest", which effectively means page 1
-	// If user wants to reload current page, that's different.
-	// We'll reset to page 1 for standard "Refresh" behavior
 	s.currentToken = ""
 	s.tokenStack = nil
 	return s.fetchEntriesCmd("")
@@ -335,12 +339,15 @@ func (s *Service) Refresh() tea.Cmd {
 
 func (s *Service) Reset() {
 	s.err = nil
-	s.viewport.GotoTop()
+	s.viewingDetail = false
+	s.selectedEntry = nil
+	s.table.SetCursor(0)
 	s.SetHeading("")
 	s.currentToken = ""
 	s.tokenStack = nil
+	s.filter = "" // Clear filter on reset
 }
 
 func (s *Service) IsRootView() bool {
-	return true
+	return !s.viewingDetail
 }
