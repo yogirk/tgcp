@@ -212,6 +212,20 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.table.HandleWindowSizeDefault(msg)
 		s.versionTable.HandleWindowSizeDefault(msg)
 
+	case tea.MouseMsg:
+		// Forward mouse events to active table for click selection
+		if s.viewState == ViewList {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
+			return s, cmd
+		} else if s.viewState == ViewVersions {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.versionTable.Update(msg)
+			s.versionTable = updatedTable
+			return s, cmd
+		}
+
 	case tea.KeyMsg:
 		return s.handleKeyMsg(msg)
 	}

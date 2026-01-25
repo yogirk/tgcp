@@ -235,6 +235,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.subnetsTable.HandleWindowSize(msg, 9)
 		s.firewallsTable.HandleWindowSize(msg, 9)
 
+	case tea.MouseMsg:
+		// Forward mouse events to active table for click selection
+		if s.viewState == ViewList {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.networksTable.Update(msg)
+			s.networksTable = updatedTable
+			return s, cmd
+		}
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "r":

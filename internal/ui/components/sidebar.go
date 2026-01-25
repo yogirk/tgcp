@@ -96,8 +96,52 @@ func (m SidebarModel) Update(msg tea.Msg) (SidebarModel, tea.Cmd) {
 			// 'enter' usually selects the service to load in main view
 			// This will be handled by parent model inspecting the selection
 		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			// Calculate which item was clicked based on Y coordinate
+			if idx := m.getItemIndexFromY(msg.Y); idx >= 0 && idx < len(m.Items) {
+				m.Cursor = idx
+			}
+		}
 	}
 	return m, nil
+}
+
+// getItemIndexFromY maps a Y coordinate to a sidebar item index
+// Layout: Row 0 = "SERVICES" header, Row 1 = blank, Row 2+ = items with group breaks
+func (m SidebarModel) getItemIndexFromY(y int) int {
+	// Account for header ("SERVICES") and blank line after it
+	const headerRows = 2
+
+	if y < headerRows {
+		return -1 // Clicked on header
+	}
+
+	// Calculate item index accounting for group breaks
+	row := y - headerRows
+	itemIndex := 0
+	currentRow := 0
+
+	for i := range m.Items {
+		if currentRow == row {
+			return i
+		}
+		currentRow++ // Each item takes one row
+
+		// Group breaks add an extra blank row
+		if groupBreaks[i] {
+			currentRow++
+		}
+
+		itemIndex = i + 1
+	}
+
+	// If clicked past all items, return last item or -1
+	if row >= currentRow {
+		return -1
+	}
+	return itemIndex
 }
 
 func (m SidebarModel) View() string {

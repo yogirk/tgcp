@@ -241,6 +241,21 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.table.HandleWindowSizeDefault(msg)
 		s.objectTable.HandleWindowSizeDefault(msg)
 
+	// 4.5 Mouse Input
+	case tea.MouseMsg:
+		// Forward mouse events to active table for click selection
+		if s.viewState == ViewList {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
+			return s, cmd
+		} else if s.viewState == ViewObjects {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.objectTable.Update(msg)
+			s.objectTable = updatedTable
+			return s, cmd
+		}
+
 	// 5. User Input
 	case tea.KeyMsg:
 		// Handle filter mode (list or object view)

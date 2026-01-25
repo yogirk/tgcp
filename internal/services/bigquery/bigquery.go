@@ -226,6 +226,21 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.tableTable.HandleWindowSizeDefault(msg)
 		s.schemaTable.HandleWindowSizeDefault(msg)
 
+	case tea.MouseMsg:
+		// Forward mouse events to active table for click selection
+		switch s.viewState {
+		case ViewDatasets:
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.datasetTable.Update(msg)
+			s.datasetTable = updatedTable
+			return s, cmd
+		case ViewTables:
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.tableTable.Update(msg)
+			s.tableTable = updatedTable
+			return s, cmd
+		}
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "r":

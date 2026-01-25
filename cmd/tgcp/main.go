@@ -61,7 +61,9 @@ func main() {
 	initialModel := ui.InitialModel(authState, cfg)
 
 	// 6. Start Bubbletea Program
-	p := tea.NewProgram(initialModel, tea.WithAltScreen())
+	// WithMouseCellMotion enables mouse click support
+	// Users can hold Shift to select text (standard terminal behavior)
+	p := tea.NewProgram(initialModel, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v\n", err)
 		os.Exit(1)

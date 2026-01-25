@@ -196,6 +196,15 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		s.table.HandleWindowSizeDefault(msg)
 
+	case tea.MouseMsg:
+		// Forward mouse events to table for click selection
+		if s.viewState == ViewListTopics || s.viewState == ViewListSubs {
+			var updatedTable *components.StandardTable
+			updatedTable, cmd = s.table.Update(msg)
+			s.table = updatedTable
+			return s, cmd
+		}
+
 	case tea.KeyMsg:
 		// Handle filter mode (only in list views)
 		if s.viewState == ViewListTopics || s.viewState == ViewListSubs {
