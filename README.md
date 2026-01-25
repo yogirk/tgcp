@@ -8,12 +8,15 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
 - **🚀 Fast Navigation**: Global vim-style keybindings (`j/k`, `Shift+H/L`).
 - **🔐 Secure Authentication**: Uses Application Default Credentials (ADC) - no new keys to manage.
 - **⚡ Smart Caching**: Instant tab switching with background data refreshes.
+- **🖱️ Mouse Support**: Click to select items; hold Shift to select text.
 - **🛠️ Service Support**:
     - **Compute**: GCE Instances (Manage power state, SSH), GKE Clusters (Launch k9s), Cloud Run, Cloud Functions.
     - **Data**: Cloud SQL, BigQuery, Bigtable, Spanner, Firestore, Redis.
     - **Storage**: GCS Buckets, Persistent Disks.
-    - **Networking**: VPCs, Subnets.
+    - **Security**: IAM, Secret Manager.
+    - **Networking**: VPCs, Subnets, Firewalls.
     - **Analytics**: Pub/Sub, Dataflow, Dataproc.
+    - **Observability**: Cloud Logging.
 - **🛡️ Safety**: Read-only by default for sensitive configs; confirmation dialogs for actions.
 - **📚 Documentation**:
     - [Feature Deep Dive](docs/FEATURES.md)
@@ -124,6 +127,8 @@ ui:
 | `↓` / `j` | Move selection down |
 | `Enter` | Select item / View Details |
 | `Tab` | Toggle Sidebar visibility |
+| `Click` | Select item (mouse/trackpad) |
+| `Shift+Drag` | Select text for copy |
 
 #### Service Actions
 | Key | Action | Context |

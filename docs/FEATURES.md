@@ -5,10 +5,12 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 ## Core Capabilities
 
 -   **Fast Navigation**: Global keyboard shortcuts (`Shift+Left/Right` to switch tabs/services, `j/k` for list navigation).
+-   **Mouse Support**: Click to select items in the sidebar and service lists. Hold Shift while dragging to select text for copying.
 -   **Service Sidebar**: Quick access to all supported GCP services.
 -   **Command Palette**: Access any resource or command instantly with `:`.
 -   **Smart Caching**: Minimizes API calls for a responsive experience.
 -   **ADC Authentication**: Seamless integration with your existing `gcloud` credentials.
+-   **Version Updates**: Automatic update checking with notifications when new versions are available.
 
 ## Supported Services
 
@@ -39,6 +41,11 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 -   **Service Accounts**: Audit service accounts and their keys.
 -   **Policy Review**: View IAM policies (read-only in MVP).
 
+### Secret Manager
+-   **Secret Listing**: View all secrets in your project.
+-   **Version Management**: Browse secret versions and metadata.
+-   **Safe by Default**: Secret values are never displayed to prevent accidental exposure.
+
 ### Networking
 -   **VPC Networks**: List Virtual Private Clouds.
 -   **Subnets**: View subnetworks and their IP ranges.
@@ -57,8 +64,13 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 -   **Disks**: Manage Persistent Disks.
 -   **Orphaned Disk Detection**: Easily identify unused disks to save costs.
 
+### Observability
+-   **Cloud Logging**: Browse and filter logs across your project.
+-   **Log Entries**: View structured log entries with severity levels.
+-   **Resource Filtering**: Filter logs by resource type and labels.
+
 ## Future Roadmap
 
 -   **Billing Integration**: View daily cost estimates.
--   **Log Tailing**: Live stream logs for resources.
+-   **Live Log Tailing**: Real-time streaming of logs for resources.
 -   **Resource Graph**: Visualize dependencies between resources.
