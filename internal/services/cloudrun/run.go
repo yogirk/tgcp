@@ -128,7 +128,7 @@ func (s *Service) ShortName() string {
 // HelpText returns context-aware keybindings
 func (s *Service) HelpText() string {
 	if s.viewState == ViewList {
-		return "[]:Tabs  r:Refresh  /:Filter  Ent:Detail"
+		return "[]:Tabs  r:Refresh  /:Filter  l:Logs  Ent:Detail"
 	}
 	if s.viewState == ViewDetail {
 		return "Esc/q:Back"
@@ -316,8 +316,18 @@ func (s *Service) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						s.viewState = ViewDetail
 					}
 				}
+			case "l": // Logs
+				if s.activeTab == TabServices {
+					svcs := s.getFilteredServices(s.services, s.filter.Value())
+					if idx := s.table.Cursor(); idx >= 0 && idx < len(svcs) {
+						svc := svcs[idx]
+						// Strict quoting for filter
+						filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, svc.Name)
+						heading := fmt.Sprintf("Service: %s", svc.Name)
+						return s, func() tea.Msg { return core.SwitchToLogsMsg{Filter: filter, Source: "run", Heading: heading} }
+					}
+				}
 			}
-
 			var updatedTable *components.StandardTable
 			if s.activeTab == TabServices {
 				updatedTable, cmd = s.table.Update(msg)
