@@ -57,10 +57,17 @@ func main() {
 	// We do this synchronously for now for the MVP Foundation
 	authState := core.Authenticate(context.Background(), targetProject)
 
-	// 5. Initialize UI Model
-	initialModel := ui.InitialModel(authState, cfg)
+	// 5. Create Version Info
+	versionInfo := core.VersionInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
 
-	// 6. Start Bubbletea Program
+	// 6. Initialize UI Model
+	initialModel := ui.InitialModel(authState, cfg, versionInfo)
+
+	// 7. Start Bubbletea Program
 	// WithMouseCellMotion enables mouse click support
 	// Users can hold Shift to select text (standard terminal behavior)
 	p := tea.NewProgram(initialModel, tea.WithAltScreen(), tea.WithMouseCellMotion())

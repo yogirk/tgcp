@@ -94,12 +94,25 @@ func renderLandingPage(m MainModel) string {
 	// Minimal navigation hint
 	hints := styles.SubtleStyle.Render("↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette")
 
+	// Version info
+	versionText := styles.SubtleStyle.Render(m.Version.FormatVersion())
+
+	// Update notification (if available)
+	var updateNotice string
+	if m.UpdateInfo != nil && m.UpdateInfo.Available {
+		updateStyle := lipgloss.NewStyle().
+			Foreground(styles.ColorSuccess).
+			Bold(true)
+		updateNotice = updateStyle.Render(
+			fmt.Sprintf("Update available: %s -> %s", m.Version.FormatVersion(), "v"+m.UpdateInfo.LatestVersion),
+		) + "\n" + styles.SubtleStyle.Render("Run: brew upgrade tgcp  or  visit github.com/yogirk/tgcp/releases")
+	}
+
 	// Layout: Center everything
 	// We use lipgloss.Place to center vertically and horizontally
 
 	// Combine components vertically
-	body := lipgloss.JoinVertical(
-		lipgloss.Center,
+	bodyParts := []string{
 		banner,
 		"\n",
 		infoBox,
@@ -107,7 +120,15 @@ func renderLandingPage(m MainModel) string {
 		menu,
 		"\n",
 		hints,
-	)
+		versionText,
+	}
+
+	// Add update notice if available
+	if updateNotice != "" {
+		bodyParts = append(bodyParts, "\n", updateNotice)
+	}
+
+	body := lipgloss.JoinVertical(lipgloss.Center, bodyParts...)
 
 	return lipgloss.Place(
 		m.Width, m.Height-1, // -1 for status bar space if needed
