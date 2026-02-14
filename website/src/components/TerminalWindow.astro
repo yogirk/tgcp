@@ -1,0 +1,24 @@
+---
+interface Props {
+  title?: string;
+  class?: string;
+}
+
+const { title = 'tgcp', class: className = '' } = Astro.props;
+---
+
+<div class:list={['rounded-lg border border-border-subtle bg-bg-surface overflow-hidden', className]}>
+  <!-- Title bar -->
+  <div class="flex items-center gap-2 border-b border-border-subtle bg-bg-elevated/50 px-4 py-2.5">
+    <div class="flex gap-1.5">
+      <span class="h-3 w-3 rounded-full bg-[#ff5f57]"></span>
+      <span class="h-3 w-3 rounded-full bg-[#ffbd2e]"></span>
+      <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
+    </div>
+    <span class="ml-2 text-xs text-text-muted font-mono">{title}</span>
+  </div>
+  <!-- Content -->
+  <div class="p-4 font-mono text-sm leading-relaxed">
+    <slot />
+  </div>
+</div>

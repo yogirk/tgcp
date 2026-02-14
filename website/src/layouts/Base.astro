@@ -1,0 +1,45 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'TGCP - Terminal GCP Explorer',
+  description = 'A terminal-based UI for observing and managing Google Cloud Platform resources. Fast, keyboard-driven, zero config.',
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+
+    <!-- Preload critical fonts -->
+    <link rel="preload" href={`${base}fonts/google-sans-flex-latin.woff2`} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={`${base}fonts/google-sans-code-latin.woff2`} as="font" type="font/woff2" crossorigin />
+
+    <!-- OG -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body class="min-h-screen relative overflow-x-hidden">
+    <!-- Subtle background gradients -->
+    <div class="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+      <div class="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-blue/5 blur-[120px]"></div>
+      <div class="absolute -right-40 -bottom-40 h-[500px] w-[500px] rounded-full bg-green/5 blur-[120px]"></div>
+    </div>
+    <div class="relative z-10">
+      <slot />
+    </div>
+  </body>
+</html>

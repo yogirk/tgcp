@@ -1,0 +1,59 @@
+---
+import AsciiLogo from './AsciiLogo.astro';
+import TerminalWindow from './TerminalWindow.astro';
+
+const terminalLines = [
+  { prompt: true, text: 'brew install tgcp' },
+  { prompt: false, text: '==> Downloading tgcp...' },
+  { prompt: false, text: '==> Installing tgcp' },
+  { prompt: false, text: '🍺  /usr/local/Cellar/tgcp/0.1.0: installed' },
+  { prompt: true, text: 'tgcp' },
+  { prompt: false, text: '' },
+  { prompt: false, text: '  Compute      GCE Instances ∙ GKE Clusters ∙ Cloud Run' },
+  { prompt: false, text: '  Data         Cloud SQL ∙ BigQuery ∙ Bigtable' },
+  { prompt: false, text: '  Storage      GCS Buckets ∙ Persistent Disks' },
+  { prompt: false, text: '  Security     IAM ∙ Secret Manager' },
+  { prompt: false, text: '  Networking   VPCs ∙ Subnets ∙ Firewalls' },
+];
+---
+
+<section class="px-6 py-20 md:py-28">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
+    <!-- Left: ASCII + tagline -->
+    <div class="animate-fade-up">
+      <AsciiLogo />
+      <h1 class="mt-6 text-3xl font-bold leading-tight md:text-4xl lg:text-5xl">
+        Your GCP terminal<br />
+        <span class="text-text-secondary">companion.</span>
+      </h1>
+      <p class="mt-4 max-w-lg text-lg text-text-secondary">
+        A fast, keyboard-driven TUI for observing and managing Google Cloud Platform resources. Inspired by k9s.
+      </p>
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <code class="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-4 py-2.5 font-mono text-sm">
+          <span class="text-text-muted">$</span>
+          <span>brew tap yogirk/tgcp && brew install tgcp</span>
+        </code>
+      </div>
+    </div>
+
+    <!-- Right: Animated terminal -->
+    <div class="animate-fade-up" style="animation-delay: 0.15s">
+      <TerminalWindow>
+        {terminalLines.map((line, i) => (
+          <div
+            class="animate-reveal-line whitespace-pre"
+            style={`animation-delay: ${0.3 + i * 0.18}s`}
+          >
+            {line.prompt && <span class="text-green">❯ </span>}
+            <span class={line.prompt ? 'text-text-primary' : 'text-text-secondary'}>{line.text}</span>
+          </div>
+        ))}
+        <div class="mt-1 animate-reveal-line" style={`animation-delay: ${0.3 + terminalLines.length * 0.18}s`}>
+          <span class="text-green">❯ </span>
+          <span class="inline-block h-4 w-2 translate-y-0.5 bg-text-primary animate-blink"></span>
+        </div>
+      </TerminalWindow>
+    </div>
+  </div>
+</section>

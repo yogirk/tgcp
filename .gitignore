@@ -30,3 +30,8 @@ debug.log
 # Internal agent documentation
 .aidocs/
 
+# Website
+website/node_modules/
+website/dist/
+website/.astro/
+

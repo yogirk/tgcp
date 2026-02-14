@@ -1,0 +1,43 @@
+---
+import { categories } from '../data/services';
+
+const colorMap: Record<string, { badge: string; dot: string }> = {
+  blue:   { badge: 'bg-blue/10 text-blue', dot: 'bg-blue' },
+  red:    { badge: 'bg-red/10 text-red', dot: 'bg-red' },
+  yellow: { badge: 'bg-yellow/10 text-yellow', dot: 'bg-yellow' },
+  green:  { badge: 'bg-green/10 text-green', dot: 'bg-green' },
+};
+---
+
+<section class="px-6 py-20 md:py-28">
+  <div class="mx-auto max-w-6xl">
+    <h2 class="text-center text-2xl font-bold md:text-3xl">
+      Every service you need,<br />
+      <span class="text-text-secondary">right in your terminal.</span>
+    </h2>
+
+    <div class="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      {categories.map((cat) => {
+        const c = colorMap[cat.color];
+        return (
+          <div class="rounded-xl border border-border-subtle p-5">
+            <span class:list={['inline-block rounded-md px-2.5 py-1 text-xs font-medium', c.badge]}>
+              {cat.name}
+            </span>
+            <ul class="mt-4 space-y-2.5">
+              {cat.services.map((svc) => (
+                <li class="flex items-start gap-2.5">
+                  <span class:list={['mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', c.dot]} />
+                  <div>
+                    <span class="text-sm font-medium">{svc.name}</span>
+                    <span class="ml-1.5 text-xs text-text-muted">{svc.description}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+</section>
