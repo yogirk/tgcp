@@ -56,6 +56,20 @@
 - github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 - ANSI escape sequence handling
 - github.com/atotto/clipboard v0.1.4 - System clipboard access
 
+## Website (Landing Page)
+
+**Framework:**
+- Astro v5.17 - Static site generator (single-page landing site)
+- Tailwind CSS v4.1 - Styling via `@tailwindcss/vite` plugin with inline theme
+
+**Fonts:**
+- Google Sans Flex - Headings and body text (self-hosted woff2)
+- Google Sans Code - Terminal/code blocks (self-hosted woff2)
+
+**Deployment:**
+- GitHub Pages at `https://yogirk.github.io/tgcp` (base path: `/tgcp`)
+- GitHub stars count fetched at build time via GitHub REST API
+
 ## Configuration
 
 **Environment:**

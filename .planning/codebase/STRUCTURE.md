@@ -76,7 +76,21 @@ tgcp/
 ├── go.sum                        # Dependency checksums
 ├── .goreleaser.yaml              # Release configuration
 ├── README.md                     # Main documentation
-└── LICENSE                       # MIT license
+├── LICENSE                       # MIT license
+└── website/                       # Landing page (Astro + Tailwind v4)
+    ├── src/
+    │   ├── components/           # Astro components (Header, Hero, Services, etc.)
+    │   ├── data/
+    │   │   └── services.ts       # Service catalog (KEEP IN SYNC with TUI)
+    │   ├── layouts/
+    │   │   └── Base.astro        # Base HTML layout
+    │   ├── pages/
+    │   │   └── index.astro       # Single-page landing site
+    │   └── styles/
+    │       └── global.css        # Tailwind v4 theme tokens + animations
+    ├── public/                   # Static assets (fonts, favicon)
+    ├── astro.config.mjs          # Astro config (GitHub Pages base: '/tgcp')
+    └── package.json              # Astro + Tailwind dependencies
 ```
 
 ## Directory Purposes
@@ -228,6 +242,7 @@ tgcp/
    - `views.go`: (optional) Rendering logic if complex
 3. Register in `internal/ui/model.go`: `registerAllServices()` function
 4. Add command to palette in `internal/core/navigation.go`: `defaultCommands()` function
+5. **Update website**: Add service to `website/src/data/services.ts` (and update `website/src/components/Hero.astro` TUI preview if category structure changes)
 
 **New UI Component:**
 1. Create file: `internal/ui/components/{component}.go`
@@ -259,6 +274,16 @@ tgcp/
 - Generated: No (all hand-written)
 - Committed: Yes (all committed to git)
 - Structure: Each service is independent; can be added/removed without affecting others
+
+**website/:**
+- Purpose: Landing page at https://yogirk.github.io/tgcp
+- Stack: Astro 5 + Tailwind CSS v4 (dark-mode only, terminal aesthetic)
+- Key data file: `src/data/services.ts` — must stay in sync with TUI service catalog
+- Key components: Hero (TUI preview), Services (tree view), Install (3 methods)
+- GitHub stars fetched at build time in `src/components/Header.astro`
+- Deployed to GitHub Pages with base path `/tgcp`
+- Generated: No (hand-maintained)
+- Committed: Yes
 
 **assets/:**
 - Purpose: Static files (currently just image.png for README)

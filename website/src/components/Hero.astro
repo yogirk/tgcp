@@ -1,20 +1,6 @@
 ---
 import AsciiLogo from './AsciiLogo.astro';
 import TerminalWindow from './TerminalWindow.astro';
-
-const terminalLines = [
-  { prompt: true, text: 'brew install tgcp' },
-  { prompt: false, text: '==> Downloading tgcp...' },
-  { prompt: false, text: '==> Installing tgcp' },
-  { prompt: false, text: '🍺  /usr/local/Cellar/tgcp/0.1.0: installed' },
-  { prompt: true, text: 'tgcp' },
-  { prompt: false, text: '' },
-  { prompt: false, text: '  Compute      GCE Instances ∙ GKE Clusters ∙ Cloud Run' },
-  { prompt: false, text: '  Data         Cloud SQL ∙ BigQuery ∙ Bigtable' },
-  { prompt: false, text: '  Storage      GCS Buckets ∙ Persistent Disks' },
-  { prompt: false, text: '  Security     IAM ∙ Secret Manager' },
-  { prompt: false, text: '  Networking   VPCs ∙ Subnets ∙ Firewalls' },
-];
 ---
 
 <section class="px-6 py-20 md:py-28">
@@ -37,21 +23,59 @@ const terminalLines = [
       </div>
     </div>
 
-    <!-- Right: Animated terminal -->
+    <!-- Right: Terminal with TUI preview -->
     <div class="animate-fade-up" style="animation-delay: 0.15s">
       <TerminalWindow>
-        {terminalLines.map((line, i) => (
-          <div
-            class="animate-reveal-line whitespace-pre"
-            style={`animation-delay: ${0.3 + i * 0.18}s`}
-          >
-            {line.prompt && <span class="text-green">❯ </span>}
-            <span class={line.prompt ? 'text-text-primary' : 'text-text-secondary'}>{line.text}</span>
+        <!-- Install command -->
+        <div class="animate-reveal-line" style="animation-delay: 0.3s">
+          <span class="text-green">❯ </span><span>brew tap yogirk/tgcp && brew install tgcp</span>
+        </div>
+        <div class="animate-reveal-line text-text-secondary" style="animation-delay: 0.65s">
+          🍺 tgcp 0.2.0 installed
+        </div>
+        <div class="animate-reveal-line" style="animation-delay: 1.0s">
+          <span class="text-green">❯ </span><span>tgcp</span>
+        </div>
+
+        <!-- TUI Preview (appears as one block) -->
+        <div class="animate-fade-up mt-4" style="animation-delay: 1.4s">
+          <!-- Info bar -->
+          <div class="border border-border-subtle rounded px-2.5 py-1.5 mb-3 flex gap-4 text-xs text-text-secondary">
+            <span>👤 user@company.com</span>
+            <span>📁 my-gcp-project</span>
           </div>
-        ))}
-        <div class="mt-1 animate-reveal-line" style={`animation-delay: ${0.3 + terminalLines.length * 0.18}s`}>
-          <span class="text-green">❯ </span>
-          <span class="inline-block h-4 w-2 translate-y-0.5 bg-text-primary animate-blink"></span>
+
+          <!-- Services panel -->
+          <div class="border border-border-subtle rounded px-3 py-2.5">
+            <div class="mb-2">
+              <span class="bg-text-secondary text-bg-deep text-xs px-1.5 py-0.5 rounded-sm font-bold">Services</span>
+            </div>
+            <div class="space-y-0.5 text-xs leading-relaxed">
+              <div><span class="text-blue">▸ Overview (Command Center)</span></div>
+              <div><span class="text-blue">▼ Compute</span></div>
+              <div class="pl-4 text-text-secondary">Compute Engine (GCE)</div>
+              <div class="pl-4 text-text-secondary">Kubernetes Engine (GKE)</div>
+              <div class="pl-4 text-text-secondary">Cloud Run</div>
+              <div><span class="text-blue">▼ Storage</span></div>
+              <div class="pl-4 text-text-secondary">Cloud Storage (GCS)</div>
+              <div class="pl-4 text-text-secondary">Disks (Block Storage)</div>
+              <div><span class="text-blue">▼ Databases</span></div>
+              <div class="pl-4 text-text-secondary">Cloud SQL</div>
+              <div class="pl-4 text-text-secondary">Spanner</div>
+              <div class="pl-4 text-text-secondary">Bigtable</div>
+              <div><span class="text-blue">▸ Data & Analytics</span></div>
+              <div><span class="text-blue">▸ Security & Networking</span></div>
+              <div><span class="text-blue">▸ Observability</span></div>
+            </div>
+          </div>
+
+          <!-- Keybinding bar -->
+          <div class="mt-2.5 flex flex-wrap justify-center gap-x-3 gap-y-0.5 text-[10px] text-text-muted">
+            <span>↑/↓ navigate</span>
+            <span>Space expand/collapse</span>
+            <span>Enter select</span>
+            <span>? help</span>
+          </div>
         </div>
       </TerminalWindow>
     </div>
