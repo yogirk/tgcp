@@ -1,5 +1,7 @@
 # TGCP (Terminal GCP Explorer)
 
+**[Website](https://yogirk.github.io/tgcp)** | **[GitHub](https://github.com/yogirk/tgcp)** | **[Releases](https://github.com/yogirk/tgcp/releases)**
+
 TGCP is a terminal-based user interface for observing and managing Google Cloud Platform resources, inspired by tools like K9s and TAWS. It provides a fast, keyboard-driven experience for DevOps engineers and Cloud Administrators.
 
 ![TGCP Terminal Interface](image.png)
