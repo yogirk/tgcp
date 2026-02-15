@@ -1,0 +1,42 @@
+---
+import { categories } from '../data/services';
+import TerminalWindow from './TerminalWindow.astro';
+
+const colorMap: Record<string, string> = {
+  blue: 'text-blue',
+  red: 'text-red',
+  yellow: 'text-yellow',
+  green: 'text-green',
+};
+---
+
+<section class="px-6 py-20 md:py-28">
+  <div class="mx-auto max-w-6xl">
+    <h2 class="text-center text-2xl font-bold md:text-3xl">
+      Every service you need,<br />
+      <span class="text-text-secondary">right in your terminal.</span>
+    </h2>
+
+    <div class="mt-12">
+      <TerminalWindow title="tgcp — services">
+        <div class="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((cat) => (
+            <div>
+              <div class:list={['font-bold', colorMap[cat.color]]}>
+                ▼ {cat.name}
+              </div>
+              <div class="mt-1.5 space-y-1 pl-4">
+                {cat.services.map((svc) => (
+                  <div>
+                    <span class="text-text-primary">{svc.name}</span>
+                    <span class="ml-1.5 text-xs text-text-muted">{svc.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </TerminalWindow>
+    </div>
+  </div>
+</section>

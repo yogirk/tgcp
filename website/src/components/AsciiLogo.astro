@@ -1,0 +1,54 @@
+---
+// ASCII letter splits matching internal/ui/banner.go exactly
+const letterT = [
+  '████████╗',
+  '╚══██╔══╝',
+  '   ██║   ',
+  '   ██║   ',
+  '   ██║   ',
+  '   ╚═╝   ',
+];
+const letterG = [
+  ' ██████╗ ',
+  '██╔════╝ ',
+  '██║  ███╗',
+  '██║   ██║',
+  '╚██████╔╝',
+  ' ╚═════╝ ',
+];
+const letterC = [
+  ' ██████╗',
+  ' ██╔════╝',
+  ' ██║     ',
+  ' ██║     ',
+  ' ╚██████╗',
+  '  ╚═════╝',
+];
+const letterP = [
+  '██████╗ ',
+  '██╔══██╗',
+  '██████╔╝',
+  '██╔═══╝ ',
+  '██║     ',
+  '╚═╝     ',
+];
+
+const colors = ['text-blue', 'text-red', 'text-yellow', 'text-green'];
+const letters = [letterT, letterG, letterC, letterP];
+---
+
+<!-- Desktop: full ASCII banner -->
+<div class="hidden sm:block font-mono text-[0.55rem] leading-[1.15] md:text-[0.7rem] lg:text-xs" aria-label="TGCP ASCII art logo" role="img">
+  {Array.from({ length: 6 }).map((_, row) => (
+    <div class="whitespace-pre">
+      {letters.map((letter, i) => (
+        <span class={colors[i]}>{letter[row]}</span>
+      ))}
+    </div>
+  ))}
+</div>
+
+<!-- Mobile: colored wordmark -->
+<div class="block sm:hidden text-4xl font-bold tracking-tight font-mono" aria-label="TGCP">
+  <span class="text-blue">T</span><span class="text-red">G</span><span class="text-yellow">C</span><span class="text-green">P</span>
+</div>
