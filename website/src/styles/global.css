@@ -116,3 +116,33 @@ body {
   opacity: 0;
   animation: reveal-line 0.3s ease-out forwards;
 }
+
+/* ── Cursor-following spotlight ── */
+#cursor-spotlight {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(66, 133, 244, 0.04) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+body:hover #cursor-spotlight {
+  opacity: 1;
+}
+
+/* ── Button press feedback ── */
+a[href="#install"],
+.copy-btn,
+header a {
+  transition: all 0.2s ease;
+}
+
+a[href="#install"]:active,
+.copy-btn:active {
+  transform: scale(0.97);
+}

@@ -38,8 +38,19 @@ const base = import.meta.env.BASE_URL;
       <div class="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-blue/5 blur-[120px]"></div>
       <div class="absolute -right-40 -bottom-40 h-[500px] w-[500px] rounded-full bg-green/5 blur-[120px]"></div>
     </div>
+    <!-- Cursor-following spotlight -->
+    <div id="cursor-spotlight" aria-hidden="true"></div>
     <div class="relative z-10">
       <slot />
     </div>
+    <script>
+      const spotlight = document.getElementById('cursor-spotlight');
+      if (spotlight && window.matchMedia('(pointer: fine)').matches) {
+        document.addEventListener('mousemove', (e) => {
+          spotlight.style.left = e.clientX + 'px';
+          spotlight.style.top = e.clientY + 'px';
+        });
+      }
+    </script>
   </body>
 </html>

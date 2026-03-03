@@ -7,7 +7,7 @@ interface Props {
 const { title = 'tgcp', class: className = '' } = Astro.props;
 ---
 
-<div class:list={['rounded-lg border border-border-subtle bg-bg-surface overflow-hidden', className]}>
+<div class:list={['rounded-lg border border-border-subtle bg-bg-surface overflow-hidden transition-all duration-300 hover:border-border-subtle/80 hover:shadow-[0_0_40px_rgba(66,133,244,0.06)]', className]}>
   <!-- Title bar -->
   <div class="flex items-center gap-2 border-b border-border-subtle bg-bg-elevated/50 px-4 py-2.5">
     <div class="flex gap-1.5">

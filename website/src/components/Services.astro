@@ -21,13 +21,13 @@ const colorMap: Record<string, string> = {
       <TerminalWindow title="tgcp — services">
         <div class="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((cat) => (
-            <div>
-              <div class:list={['font-bold', colorMap[cat.color]]}>
-                ▼ {cat.name}
+            <div class="group/cat">
+              <div class:list={['font-bold transition-opacity duration-200', colorMap[cat.color]]}>
+                &#x25BC; {cat.name}
               </div>
-              <div class="mt-1.5 space-y-1 pl-4">
+              <div class="mt-1.5 space-y-0.5 pl-4">
                 {cat.services.map((svc) => (
-                  <div>
+                  <div class="rounded px-1.5 py-0.5 -ml-1.5 transition-all duration-200 hover:bg-blue/[0.08] hover:text-text-primary cursor-default">
                     <span class="text-text-primary">{svc.name}</span>
                     <span class="ml-1.5 text-xs text-text-muted">{svc.description}</span>
                   </div>
