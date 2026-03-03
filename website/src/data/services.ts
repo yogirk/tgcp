@@ -67,4 +67,12 @@ export const categories: ServiceCategory[] = [
       { name: 'Cloud Logging', description: 'Log explorer' },
     ],
   },
+  {
+    name: 'DevOps',
+    color: 'red',
+    services: [
+      { name: 'Cloud Build', description: 'CI/CD pipelines' },
+      { name: 'Artifact Registry', description: 'Container & package registry' },
+    ],
+  },
 ];
