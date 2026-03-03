@@ -8,8 +8,10 @@ import (
 	"github.com/yogirk/tgcp/internal/config"
 	"github.com/yogirk/tgcp/internal/core"
 	"github.com/yogirk/tgcp/internal/services"
+	"github.com/yogirk/tgcp/internal/services/artifactregistry"
 	"github.com/yogirk/tgcp/internal/services/bigquery"
 	"github.com/yogirk/tgcp/internal/services/bigtable"
+	"github.com/yogirk/tgcp/internal/services/cloudbuild"
 	"github.com/yogirk/tgcp/internal/services/cloudrun"
 	"github.com/yogirk/tgcp/internal/services/cloudsql"
 	"github.com/yogirk/tgcp/internal/services/dataflow"
@@ -64,9 +66,9 @@ type MainModel struct {
 	Sidebar   components.SidebarModel
 	HomeMenu  components.HomeMenuModel // Added
 	StatusBar components.StatusBarModel
-	Palette   components.PaletteModel  // Added
-	Toast     *components.ToastModel   // Toast notification (nil when hidden)
-	Spinner   components.SpinnerModel  // Global loading spinner
+	Palette   components.PaletteModel // Added
+	Toast     *components.ToastModel  // Toast notification (nil when hidden)
+	Spinner   components.SpinnerModel // Global loading spinner
 
 	// State
 	ViewMode      ViewMode // Added
@@ -149,7 +151,7 @@ func (m *MainModel) getOrInitializeService(ctx context.Context, serviceName stri
 		}
 		return svc, nil
 	}
-	
+
 	// Service doesn't exist in map - try to get it from registry (lazy creation)
 	if m.ServiceRegistry != nil {
 		svc, err := m.ServiceRegistry.GetOrInitializeService(ctx, serviceName)
@@ -162,7 +164,7 @@ func (m *MainModel) getOrInitializeService(ctx context.Context, serviceName stri
 			return svc, nil
 		}
 	}
-	
+
 	return nil, nil // Service not found
 }
 
@@ -233,8 +235,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.ShowHelp = false
 					return m, nil
 				}
-				// Removed old global handler, new one is inside Service Mode block
 				if m.ViewMode == ViewHome {
+					// Don't quit if user is typing in filter
+					if m.HomeMenu.FilterActive() {
+						break
+					}
+					// Let home menu handle clearing the filter
+					if m.HomeMenu.HasFilter() {
+						break
+					}
 					return m, tea.Quit
 				}
 				// If in Service Mode, we delegate to the service specific block below
@@ -250,6 +259,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				return m, tea.Quit
 			case ":":
+				if m.ViewMode == ViewHome && m.HomeMenu.FilterActive() {
+					break // let filter input receive ":"
+				}
 				m.LastFocus = m.Focus
 				m.setFocus(FocusPalette)
 				m.Navigation.PaletteActive = true
@@ -257,6 +269,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.StatusBar.Message = "Type command..."
 				return m, nil
 			case "?":
+				if m.ViewMode == ViewHome && m.HomeMenu.FilterActive() {
+					break // let filter input receive "?"
+				}
 				m.ShowHelp = !m.ShowHelp
 				return m, nil
 			case "tab":
@@ -398,12 +413,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// HOME MODE
 		if m.ViewMode == ViewHome && !m.ShowHelp && m.Focus != FocusPalette {
 			switch msg.String() {
-			case "enter", " ":
-				// If on category header, toggle it
-				if m.HomeMenu.IsOnCategory() {
-					m.HomeMenu.ToggleCurrentCategory()
-					return m, nil
-				}
+			case "enter":
 				// Select service
 				selected := m.HomeMenu.SelectedItem()
 				if selected.ShortName != "" && !selected.IsComing { // Only allow entering implemented services
@@ -662,9 +672,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.Height = availableHeight
 		m.StatusBar.Width = msg.Width
 
-		// Update home menu with screen dimensions for mouse click calculations
+		// Update home menu with screen dimensions
 		m.HomeMenu.ScreenWidth = msg.Width
 		m.HomeMenu.ScreenHeight = msg.Height
+		m.HomeMenu.UpdateViewportRows()
 
 	case tea.MouseMsg:
 		// Handle mouse clicks for focus switching and selection
@@ -889,6 +900,12 @@ func registerAllServices(registry *core.ServiceRegistry) {
 	})
 	registry.Register("secrets", func(cache *core.Cache) services.Service {
 		return secrets.NewService(cache)
+	})
+	registry.Register("cloudbuild", func(cache *core.Cache) services.Service {
+		return cloudbuild.NewService(cache)
+	})
+	registry.Register("artifactregistry", func(cache *core.Cache) services.Service {
+		return artifactregistry.NewService(cache)
 	})
 }
 

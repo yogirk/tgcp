@@ -92,7 +92,7 @@ func renderLandingPage(m MainModel) string {
 	menu := m.HomeMenu.View()
 
 	// Minimal navigation hint
-	hints := styles.SubtleStyle.Render("↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette")
+	hints := styles.SubtleStyle.Render("↑/↓ navigate   / filter   Enter select   ? help   : palette")
 
 	// Version info
 	versionText := styles.SubtleStyle.Render(m.Version.FormatVersion())

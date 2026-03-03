@@ -1,8 +1,12 @@
 package components
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
+
 	"github.com/yogirk/tgcp/internal/styles"
 )
 
@@ -13,20 +17,62 @@ type Category struct {
 	Services []ServiceItem
 }
 
+// serviceIcons maps service short names to icons (mirrors sidebar)
+var serviceIcons = map[string]string{
+	"overview":         "◉",
+	"gce":              "⚙",
+	"gke":              "☸",
+	"run":              "▷",
+	"gcs":              "▤",
+	"disks":            "◔",
+	"sql":              "⛁",
+	"spanner":          "⬡",
+	"bigtable":         "▦",
+	"redis":            "◇",
+	"firestore":        "◲",
+	"bq":               "⊞",
+	"dataflow":         "⇢",
+	"dataproc":         "⎈",
+	"pubsub":           "⇌",
+	"iam":              "⚿",
+	"secrets":          "✦",
+	"net":              "⇄",
+	"logs":             "☰",
+	"cloudbuild":       "◈",
+	"artifactregistry": "▣",
+}
+
+// listEntry represents a single row in the flat list (either category header or service)
+type listEntry struct {
+	isCategory   bool
+	isTopItem    bool
+	categoryIdx  int
+	serviceIdx   int
+	service      *ServiceItem // nil for category headers
+	categoryName string
+	searchText   string // "Name ShortName" for fuzzy matching
+}
+
 type HomeMenuModel struct {
-	TopItem    *ServiceItem // Top-level item (e.g., Overview) shown before categories
+	TopItem    *ServiceItem
 	Categories []Category
-	Cursor     int  // Index in the flattened visible list
 	IsFocused  bool
 
-	// Screen dimensions for mouse click calculations (set by parent)
+	// Screen dimensions
 	ScreenWidth  int
 	ScreenHeight int
+
+	filter       FilterModel
+	allEntries   []listEntry // flat list: top item + categories + services
+	filtered     []listEntry // after fuzzy filter
+	cursor       int         // index into selectable items in filtered list
+	scrollOffset int
+	viewportRows int
+	matchIndexes map[int][]int // allEntries index -> matched char positions
 }
 
 func NewHomeMenu() HomeMenuModel {
-	return HomeMenuModel{
-		// Top-level item (not in any category)
+	m := HomeMenuModel{
 		TopItem: &ServiceItem{Name: "Overview (Command Center)", ShortName: "overview", Active: true},
 		Categories: []Category{
 			{
@@ -83,52 +129,206 @@ func NewHomeMenu() HomeMenuModel {
 					{Name: "Cloud Logging", ShortName: "logs"},
 				},
 			},
+			{
+				Name:     "DevOps",
+				Expanded: true,
+				Services: []ServiceItem{
+					{Name: "Cloud Build", ShortName: "cloudbuild"},
+					{Name: "Artifact Registry", ShortName: "artifactregistry"},
+				},
+			},
 		},
-		Cursor:    0,
-		IsFocused: true,
+		IsFocused:    true,
+		filter:       NewFilterWithPlaceholder("Type to filter services..."),
+		viewportRows: 12, // conservative default before first WindowSizeMsg
 	}
+	m.rebuildEntries()
+	m.applyFilter()
+	return m
 }
 
-// menuItem represents an item in the flattened visible list
-type menuItem struct {
-	isTopItem     bool
-	isCategory    bool
-	categoryIndex int
-	serviceIndex  int // -1 for category headers
-}
+// rebuildEntries builds the flat list from TopItem + Categories
+func (m *HomeMenuModel) rebuildEntries() {
+	m.allEntries = nil
 
-// getVisibleItems returns the flattened list of visible items
-func (m HomeMenuModel) getVisibleItems() []menuItem {
-	var items []menuItem
-
-	// Add top-level item first (e.g., Overview)
 	if m.TopItem != nil {
-		items = append(items, menuItem{
-			isTopItem:     true,
-			categoryIndex: -1,
-			serviceIndex:  -1,
+		m.allEntries = append(m.allEntries, listEntry{
+			isTopItem:  true,
+			service:    m.TopItem,
+			searchText: m.TopItem.Name + " " + m.TopItem.ShortName,
 		})
 	}
 
 	for catIdx, cat := range m.Categories {
-		// Add category header
-		items = append(items, menuItem{
-			isCategory:    true,
-			categoryIndex: catIdx,
-			serviceIndex:  -1,
+		m.allEntries = append(m.allEntries, listEntry{
+			isCategory:   true,
+			categoryIdx:  catIdx,
+			categoryName: cat.Name,
 		})
-		// Add services if expanded
-		if cat.Expanded {
-			for svcIdx := range cat.Services {
-				items = append(items, menuItem{
-					isCategory:    false,
-					categoryIndex: catIdx,
-					serviceIndex:  svcIdx,
-				})
-			}
+		for svcIdx := range cat.Services {
+			svc := &m.Categories[catIdx].Services[svcIdx]
+			m.allEntries = append(m.allEntries, listEntry{
+				categoryIdx: catIdx,
+				serviceIdx:  svcIdx,
+				service:     svc,
+				searchText:  svc.Name + " " + svc.ShortName,
+			})
 		}
 	}
-	return items
+}
+
+// applyFilter filters the flat list based on the current filter query
+func (m *HomeMenuModel) applyFilter() {
+	query := m.filter.Value()
+	m.matchIndexes = make(map[int][]int)
+
+	if query == "" {
+		// No filter — show everything
+		m.filtered = make([]listEntry, len(m.allEntries))
+		copy(m.filtered, m.allEntries)
+		m.updateFilterCounts()
+		m.clampCursorAndScroll()
+		return
+	}
+
+	// Collect searchable entries (services only) with their allEntries indices
+	type searchable struct {
+		idx  int
+		text string
+	}
+	var targets []searchable
+	var texts []string
+	for i, e := range m.allEntries {
+		if e.service != nil {
+			targets = append(targets, searchable{idx: i, text: e.searchText})
+			texts = append(texts, e.searchText)
+		}
+	}
+
+	// Run fuzzy match
+	matches := fuzzy.Find(query, texts)
+	matchedEntryIdxs := make(map[int]bool)
+	for _, match := range matches {
+		entryIdx := targets[match.Index].idx
+		matchedEntryIdxs[entryIdx] = true
+		m.matchIndexes[entryIdx] = match.MatchedIndexes
+	}
+
+	// Build filtered list: include category headers only if they have matching services
+	m.filtered = nil
+	for i, e := range m.allEntries {
+		if e.isCategory {
+			if m.categoryHasMatch(e.categoryIdx, matchedEntryIdxs) {
+				m.filtered = append(m.filtered, e)
+			}
+		} else if matchedEntryIdxs[i] {
+			m.filtered = append(m.filtered, e)
+		}
+	}
+
+	// Reset cursor to first match when filtering
+	m.cursor = 0
+	m.scrollOffset = 0
+	m.updateFilterCounts()
+	m.clampCursorAndScroll()
+}
+
+// categoryHasMatch checks if any service in the given category matched the filter
+func (m *HomeMenuModel) categoryHasMatch(catIdx int, matchedIdxs map[int]bool) bool {
+	for i, e := range m.allEntries {
+		if !e.isCategory && e.categoryIdx == catIdx && matchedIdxs[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// updateFilterCounts sets the filter bar match/total counts
+func (m *HomeMenuModel) updateFilterCounts() {
+	// Count total selectable items (services)
+	total := 0
+	for _, e := range m.allEntries {
+		if e.service != nil {
+			total++
+		}
+	}
+	matched := 0
+	for _, e := range m.filtered {
+		if e.service != nil {
+			matched++
+		}
+	}
+	m.filter.SetMatchCounts(total, matched)
+}
+
+// selectableItems returns only selectable entries from the filtered list
+func (m *HomeMenuModel) selectableItems() []int {
+	var indices []int
+	for i, e := range m.filtered {
+		if e.service != nil {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+// clampCursorAndScroll ensures cursor and scroll are within valid bounds
+func (m *HomeMenuModel) clampCursorAndScroll() {
+	selectable := m.selectableItems()
+	if len(selectable) == 0 {
+		m.cursor = 0
+		m.scrollOffset = 0
+		return
+	}
+	if m.cursor >= len(selectable) {
+		m.cursor = len(selectable) - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	m.adjustScroll()
+}
+
+// adjustScroll ensures the cursor row is visible in the viewport
+func (m *HomeMenuModel) adjustScroll() {
+	selectable := m.selectableItems()
+	if len(selectable) == 0 || m.viewportRows <= 0 {
+		return
+	}
+
+	// The cursor's actual row in the filtered list
+	cursorRow := 0
+	if m.cursor < len(selectable) {
+		cursorRow = selectable[m.cursor]
+	}
+
+	// Ensure cursor row is visible
+	if cursorRow < m.scrollOffset {
+		m.scrollOffset = cursorRow
+	}
+	if cursorRow >= m.scrollOffset+m.viewportRows {
+		m.scrollOffset = cursorRow - m.viewportRows + 1
+	}
+
+	// Clamp scroll offset
+	maxScroll := len(m.filtered) - m.viewportRows
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if m.scrollOffset > maxScroll {
+		m.scrollOffset = maxScroll
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
+// isArrowNavKey returns true for non-printable navigation keys that should
+// pass through to cursor movement even when the filter input has focus.
+func isArrowNavKey(key string) bool {
+	return key == "up" || key == "down" ||
+		key == "home" || key == "end" ||
+		key == "pageup" || key == "pagedown"
 }
 
 func (m HomeMenuModel) Init() tea.Cmd {
@@ -136,38 +336,87 @@ func (m HomeMenuModel) Init() tea.Cmd {
 }
 
 func (m HomeMenuModel) Update(msg tea.Msg) (HomeMenuModel, tea.Cmd) {
-	visibleItems := m.getVisibleItems()
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "up", "k":
-			if m.Cursor > 0 {
-				m.Cursor--
+		key := msg.String()
+
+		// Clear applied filter with q or esc (when filter is not active but has a value)
+		if !m.filter.Active && m.filter.Value() != "" && (key == "q" || key == "esc") {
+			m.filter.TextInput.Reset()
+			m.applyFilter()
+			return m, nil
+		}
+
+		// Let filter handle its lifecycle (enter/exit/typing)
+		if m.filter.Active || key == "/" {
+			shouldExit, _, cmd := m.filter.HandleKeyMsg(msg)
+
+			if shouldExit {
+				m.applyFilter()
+				return m, cmd
 			}
-		case "down", "j":
-			if m.Cursor < len(visibleItems)-1 {
-				m.Cursor++
-			}
-		case " ": // Space to toggle category
-			if m.Cursor < len(visibleItems) {
-				item := visibleItems[m.Cursor]
-				if item.isCategory {
-					m.Categories[item.categoryIndex].Expanded = !m.Categories[item.categoryIndex].Expanded
+
+			if m.filter.Active {
+				// Only non-printable nav keys fall through; printable keys stay in filter
+				if isArrowNavKey(key) {
+					m.applyFilter()
+					// fall through to navigation below
+				} else {
+					m.applyFilter()
+					return m, cmd
 				}
+			} else if cmd != nil {
+				// Just entered filter mode
+				return m, cmd
+			}
+		}
+
+		// Navigation (works whether filter is active or not)
+		selectable := m.selectableItems()
+		switch key {
+		case "up":
+			if m.cursor > 0 {
+				m.cursor--
+				m.adjustScroll()
+			}
+		case "k":
+			if !m.filter.Active && m.cursor > 0 {
+				m.cursor--
+				m.adjustScroll()
+			}
+		case "down":
+			if m.cursor < len(selectable)-1 {
+				m.cursor++
+				m.adjustScroll()
+			}
+		case "j":
+			if !m.filter.Active && m.cursor < len(selectable)-1 {
+				m.cursor++
+				m.adjustScroll()
+			}
+		case "home", "g":
+			if !m.filter.Active {
+				m.cursor = 0
+				m.adjustScroll()
+			}
+		case "end", "G":
+			if !m.filter.Active && len(selectable) > 0 {
+				m.cursor = len(selectable) - 1
+				m.adjustScroll()
 			}
 		}
 
 	case tea.MouseMsg:
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-			// Map click Y to visible item index
-			// The view has: box padding (1) + "Services" title (1) + blank line (1) + items
-			// Plus top-level item has a blank line after it
-			if idx := m.getItemIndexFromY(msg.Y, visibleItems); idx >= 0 {
-				m.Cursor = idx
-				// If clicking on a category, toggle it
-				if idx < len(visibleItems) && visibleItems[idx].isCategory {
-					m.Categories[visibleItems[idx].categoryIndex].Expanded = !m.Categories[visibleItems[idx].categoryIndex].Expanded
+			// Map click Y to a filtered list entry
+			if idx := m.getItemFromClickY(msg.Y); idx >= 0 {
+				// Find which selectable index this corresponds to
+				selectable := m.selectableItems()
+				for si, fi := range selectable {
+					if fi == idx {
+						m.cursor = si
+						break
+					}
 				}
 			}
 		}
@@ -175,195 +424,177 @@ func (m HomeMenuModel) Update(msg tea.Msg) (HomeMenuModel, tea.Cmd) {
 	return m, nil
 }
 
-// getItemIndexFromY maps a screen Y coordinate to a visible item index
-// The menu box is centered on screen, so we calculate its position first
-func (m HomeMenuModel) getItemIndexFromY(screenY int, visibleItems []menuItem) int {
-	if m.ScreenHeight == 0 {
-		return -1 // Dimensions not set
-	}
+// getItemFromClickY maps a screen Y to a filtered list index (best effort)
+func (m HomeMenuModel) getItemFromClickY(screenY int) int {
+	// The menu is rendered inside a centered layout. We estimate:
+	// filter bar takes 1 row, then blank row, then list items
+	// This is approximate since we don't know the exact placement.
+	// We'll treat relative Y = screenY offset from estimated content start.
+	// For now, use scroll offset to map.
+	const filterBarRows = 2 // filter bar + blank line
+	const boxPadding = 1    // top padding of box
+	const titleRows = 2     // "Services" + blank line
 
-	// Calculate menu box dimensions
-	// Box content: padding(1) + title(1) + blank(1) + items + padding(1)
-	// Items: each item is 1 row, top item has extra blank after it
-	itemCount := len(visibleItems)
-	contentHeight := 3 + itemCount + 1 // header rows + items + top item's extra blank
-	for _, item := range visibleItems {
-		if item.isTopItem {
-			contentHeight++ // extra blank after top item
-			break
-		}
-	}
-
-	// Menu is vertically centered (approximately - there's banner and info box above)
-	// The landing page layout: banner + info + menu + hints, all centered
-	// For a rough estimate, assume menu starts around 40% down the screen
+	// Rough estimate of where the menu box content starts
+	// The landing page centers content vertically, so estimate ~40% down
 	menuStartY := m.ScreenHeight * 2 / 5
+	relY := screenY - menuStartY - boxPadding - titleRows - filterBarRows
 
-	// Calculate relative Y within the menu
-	relativeY := screenY - menuStartY
-
-	// Account for box padding (1 row) and title + blank (2 rows)
-	const headerOffset = 3 // padding + "Services" + blank line
-	contentY := relativeY - headerOffset
-
-	if contentY < 0 {
-		return -1 // Click above content
+	if relY < 0 {
+		return -1
 	}
 
-	// Map content Y to item index
-	row := 0
-	for i, item := range visibleItems {
-		if contentY == row {
-			return i
-		}
-		row++
-		// Top item has extra blank line after it
-		if item.isTopItem {
-			row++
-		}
+	targetRow := m.scrollOffset + relY
+	if targetRow >= 0 && targetRow < len(m.filtered) {
+		return targetRow
 	}
-
 	return -1
 }
 
 func (m HomeMenuModel) View() string {
-	visibleItems := m.getVisibleItems()
-	var lines []string
-
-	for i, item := range visibleItems {
-		isSelected := m.Cursor == i
-
-		if item.isTopItem {
-			// Render top-level item (Overview)
-			name := m.TopItem.Name
-			var rendered string
-			if isSelected {
-				rendered = styles.SelectedItemStyle.Copy().
-					UnsetBorderLeft().
-					Render("▸ " + name)
-			} else {
-				rendered = styles.UnselectedItemStyle.Copy().
-					PaddingLeft(2).
-					Render(name)
-			}
-			lines = append(lines, rendered)
-			lines = append(lines, "") // Add spacing after top item
-		} else if item.isCategory {
-			// Render category header
-			cat := m.Categories[item.categoryIndex]
-			arrow := "▼"
-			if !cat.Expanded {
-				arrow = "▶"
-			}
-
-			// Show count when collapsed
-			label := cat.Name
-			if !cat.Expanded {
-				label = cat.Name + " (" + itoa(len(cat.Services)) + ")"
-			}
-
-			var rendered string
-			if isSelected {
-				rendered = styles.SelectedItemStyle.Copy().
-					Bold(true).
-					Render(arrow + " " + label)
-			} else {
-				rendered = lipgloss.NewStyle().
-					Foreground(styles.ColorBrandAccent).
-					Bold(true).
-					PaddingLeft(1).
-					Render(arrow + " " + label)
-			}
-			lines = append(lines, rendered)
-		} else {
-			// Render service item
-			svc := m.Categories[item.categoryIndex].Services[item.serviceIndex]
-			name := svc.Name
-			if svc.IsComing {
-				name += " [Coming Soon]"
-			}
-
-			var rendered string
-			if isSelected {
-				rendered = styles.SelectedItemStyle.Copy().
-					UnsetBorderLeft().
-					Render("  ▸ " + name)
-			} else {
-				style := styles.UnselectedItemStyle.Copy().PaddingLeft(4)
-				if svc.IsComing {
-					style = style.Foreground(styles.ColorTextMuted)
-				}
-				rendered = style.Render(name)
-			}
-			lines = append(lines, rendered)
-		}
-	}
-
-	listContent := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	// Filter bar
+	filterBar := m.filter.View()
 
 	// Title
 	title := styles.HeaderStyle.Render("Services")
 
-	// Combine Title + Content
-	content := lipgloss.JoinVertical(lipgloss.Left, title, "", listContent)
+	// Category header style
+	catStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorTextMuted).
+		Bold(true).
+		PaddingLeft(1)
 
-	// Wrap in a card/box
+	// Visible slice
+	endIdx := m.scrollOffset + m.viewportRows
+	if endIdx > len(m.filtered) {
+		endIdx = len(m.filtered)
+	}
+	startIdx := m.scrollOffset
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	// Build the selectable items map for cursor highlighting
+	selectable := m.selectableItems()
+	cursorFilteredIdx := -1
+	if m.cursor >= 0 && m.cursor < len(selectable) {
+		cursorFilteredIdx = selectable[m.cursor]
+	}
+
+	var lines []string
+	for i := startIdx; i < endIdx; i++ {
+		entry := m.filtered[i]
+		if entry.isCategory {
+			// Category header: uppercase, muted, non-selectable
+			header := catStyle.Render(strings.ToUpper(entry.categoryName))
+			lines = append(lines, header)
+		} else if entry.service != nil {
+			// Service item
+			icon := serviceIcons[entry.service.ShortName]
+			if icon == "" {
+				icon = "·"
+			}
+			name := entry.service.Name
+			if entry.service.IsComing {
+				name += " [Coming Soon]"
+			}
+
+			display := icon + "  " + name
+			isSelected := i == cursorFilteredIdx
+
+			if isSelected {
+				rendered := styles.SelectedItemStyle.Copy().UnsetBorderLeft().Render("▸ " + display)
+				lines = append(lines, rendered)
+			} else {
+				style := styles.UnselectedItemStyle.Copy().PaddingLeft(2)
+				if entry.service.IsComing {
+					style = style.Foreground(styles.ColorTextMuted)
+				}
+				lines = append(lines, style.Render(display))
+			}
+		}
+	}
+
+	// Scroll indicators
+	var scrollUp, scrollDown string
+	if m.scrollOffset > 0 {
+		scrollUp = styles.SubtleStyle.Render("  ↑ more")
+	}
+	if m.scrollOffset+m.viewportRows < len(m.filtered) {
+		scrollDown = styles.SubtleStyle.Render("  ↓ more")
+	}
+
+	// Combine list with scroll indicators
+	listContent := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	if scrollUp != "" {
+		listContent = lipgloss.JoinVertical(lipgloss.Left, scrollUp, listContent)
+	}
+	if scrollDown != "" {
+		listContent = lipgloss.JoinVertical(lipgloss.Left, listContent, scrollDown)
+	}
+
+	content := lipgloss.JoinVertical(lipgloss.Left, title, "", filterBar, "", listContent)
+
+	// Fixed-height box so the menu doesn't grow beyond the viewport
+	boxHeight := m.viewportRows + 8 // items + title(1) + gaps(2) + filter(1) + padding(2) + borders(2)
 	menuBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorTextMuted).
+		BorderForeground(styles.ColorBrandAccent).
 		Padding(1, 2).
+		Height(boxHeight).
 		Render(content)
 
 	return menuBox
 }
 
-// SelectedItem returns the currently selected service (or empty if on a category)
+// SelectedItem returns the currently selected service
 func (m HomeMenuModel) SelectedItem() ServiceItem {
-	visibleItems := m.getVisibleItems()
-	if m.Cursor >= len(visibleItems) {
+	selectable := m.selectableItems()
+	if m.cursor < 0 || m.cursor >= len(selectable) {
 		return ServiceItem{}
 	}
-
-	item := visibleItems[m.Cursor]
-	if item.isTopItem {
-		return *m.TopItem
+	entry := m.filtered[selectable[m.cursor]]
+	if entry.service != nil {
+		return *entry.service
 	}
-	if item.isCategory {
-		return ServiceItem{} // No service selected when on category header
-	}
-
-	return m.Categories[item.categoryIndex].Services[item.serviceIndex]
+	return ServiceItem{}
 }
 
-// IsOnCategory returns true if cursor is on a category header
+// IsOnCategory returns true if cursor is on a category header.
+// With the new list, cursor never lands on headers.
 func (m HomeMenuModel) IsOnCategory() bool {
-	visibleItems := m.getVisibleItems()
-	if m.Cursor >= len(visibleItems) {
-		return false
-	}
-	return visibleItems[m.Cursor].isCategory
+	return false
 }
 
-// ToggleCurrentCategory toggles the category if cursor is on one
-func (m *HomeMenuModel) ToggleCurrentCategory() {
-	visibleItems := m.getVisibleItems()
-	if m.Cursor >= len(visibleItems) {
-		return
-	}
-	item := visibleItems[m.Cursor]
-	if item.isCategory {
-		m.Categories[item.categoryIndex].Expanded = !m.Categories[item.categoryIndex].Expanded
-	}
+// ToggleCurrentCategory is a no-op with the new flat list.
+func (m *HomeMenuModel) ToggleCurrentCategory() {}
+
+// FilterActive returns whether the filter input is currently active
+func (m HomeMenuModel) FilterActive() bool {
+	return m.filter.IsActive()
 }
 
-// itoa is a simple int to string conversion
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
+// HasFilter returns whether a non-empty filter value is applied
+func (m HomeMenuModel) HasFilter() bool {
+	return m.filter.Value() != ""
+}
+
+// UpdateViewportRows recalculates the number of visible rows from screen height.
+// The menu box must stay compact enough that the banner, info box, hints, and
+// status bar all remain visible on screen.
+func (m *HomeMenuModel) UpdateViewportRows() {
+	// External overhead (outside the menu box):
+	//   banner: 6, gap: 1, info box: 3, gap: 1, gap: 1, hints: 1, version: 1, status bar: 1 = 15
+	// Internal box overhead (borders, padding, title, filter):
+	//   border: 2, padding: 2, title+gap: 2, filter+gap: 2, scroll indicator: 1 = 9
+	const overhead = 24
+	rows := m.ScreenHeight - overhead
+	if rows < 5 {
+		rows = 5
 	}
-	var digits []byte
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
+	// Cap at 15 rows so the list stays compact and scrollable
+	if rows > 15 {
+		rows = 15
 	}
-	return string(digits)
+	m.viewportRows = rows
+	m.clampCursorAndScroll()
 }
