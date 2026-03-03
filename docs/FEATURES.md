@@ -5,6 +5,7 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 ## Core Capabilities
 
 -   **Fast Navigation**: Global keyboard shortcuts (`Shift+Left/Right` to switch tabs/services, `j/k` for list navigation).
+-   **Fuzzy-Filterable Home Menu**: Type to instantly filter services from the landing page.
 -   **Mouse Support**: Click to select items in the sidebar and service lists. Hold Shift while dragging to select text for copying.
 -   **Service Sidebar**: Quick access to all supported GCP services.
 -   **Command Palette**: Access any resource or command instantly with `:`.
@@ -49,6 +50,7 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 ### Networking
 -   **VPC Networks**: List Virtual Private Clouds.
 -   **Subnets**: View subnetworks and their IP ranges.
+-   **Firewalls**: View firewall rules, priorities, and targets.
 
 ### Data & Analytics
 -   **BigQuery**: Browse datasets and tables.
@@ -69,8 +71,11 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 -   **Log Entries**: View structured log entries with severity levels.
 -   **Resource Filtering**: Filter logs by resource type and labels.
 
+### DevOps
+-   **Cloud Build**: View build triggers and build history. Monitor build status across projects.
+-   **Artifact Registry**: Browse container and package repositories. View images and versions.
+
 ## Future Roadmap
 
--   **Billing Integration**: View daily cost estimates.
 -   **Live Log Tailing**: Real-time streaming of logs for resources.
 -   **Resource Graph**: Visualize dependencies between resources.

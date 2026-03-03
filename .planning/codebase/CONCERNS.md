@@ -1,6 +1,6 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-09
+**Analysis Date:** 2026-03-03
 
 ## Tech Debt
 
@@ -28,7 +28,7 @@
 **Main Model State Complexity:**
 - Issue: `MainModel` in `internal/ui/model.go` (922 lines) contains 25+ fields managing layout, services, components, and state. Complex state transitions during project switching and service navigation.
 - Files: `internal/ui/model.go`
-- Impact: Difficult to reason about state consistency. High risk of introducing state inconsistencies during modifications. Service reinitialization across all 19 services during project switch is potentially error-prone.
+- Impact: Difficult to reason about state consistency. High risk of introducing state inconsistencies during modifications. Service reinitialization across all 21 services during project switch is potentially error-prone.
 - Fix approach: Consider splitting into smaller sub-models (ProjectModel, ServiceModel, ComponentsModel). Add explicit state machine or transaction-like semantics for project switching. Add invariant checks.
 
 **Synchronization Gaps in Service Reinitialization:**
@@ -121,7 +121,7 @@
   - Track cache hit/miss metrics for optimization
 
 **Serial Service Reinitialization on Project Switch:**
-- Problem: Switching projects reinitializes 19 services sequentially (loop in `ReinitializeAll`). Each may make API calls.
+- Problem: Switching projects reinitializes 21 services sequentially (loop in `ReinitializeAll`). Each may make API calls.
 - Files: `internal/core/registry.go` (lines 120-138)
 - Cause: Sequential processing instead of concurrent
 - Impact: UI blocks during project switch, visible lag for users
@@ -137,7 +137,7 @@
 - Improvement path: Move authentication to async after TUI starts. Show loading state.
 
 **All Service Clients Created on InitialModel:**
-- Problem: `registry.InitializeAll()` creates instances of all 19 service clients immediately (though lazy initializes their state).
+- Problem: `registry.InitializeAll()` creates instances of all 21 service clients immediately (though lazy initializes their state).
 - Files: `internal/ui/model.go` (lines 88-98)
 - Impact: Startup memory cost is proportional to number of services; all client libraries loaded
 - Improvement path: Defer client creation until first access of each service
@@ -205,7 +205,7 @@
 - Scaling path: Implement bounded cache with LRU eviction (suggested 100MB limit)
 
 **Service Count Scalability:**
-- Current capacity: 19 services registered and instantiated
+- Current capacity: 21 services registered and instantiated
 - Limit: Each new service adds to startup cost and MainModel complexity
 - Scaling path: Plugin-based service registration or separate service loader. Lazy loading of service definitions.
 
@@ -304,4 +304,4 @@
 
 ---
 
-*Concerns audit: 2026-02-09*
+*Concerns audit: 2026-03-03*

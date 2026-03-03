@@ -12,13 +12,13 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
 - **⚡ Smart Caching**: Instant tab switching with background data refreshes.
 - **🖱️ Mouse Support**: Click to select items; hold Shift to select text.
 - **🛠️ Service Support**:
-    - **Compute**: GCE Instances (Manage power state, SSH), GKE Clusters (Launch k9s), Cloud Run, Cloud Functions.
-    - **Data**: Cloud SQL, BigQuery, Bigtable, Spanner, Firestore, Redis.
+    - **Compute**: GCE Instances (Manage power state, SSH), GKE Clusters (Launch k9s), Cloud Run & Cloud Functions.
     - **Storage**: GCS Buckets, Persistent Disks.
-    - **Security**: IAM, Secret Manager.
-    - **Networking**: VPCs, Subnets, Firewalls.
-    - **Analytics**: Pub/Sub, Dataflow, Dataproc.
+    - **Databases**: Cloud SQL, Spanner, Bigtable, Memorystore (Redis), Firestore.
+    - **Data & Analytics**: BigQuery, Dataflow, Dataproc, Pub/Sub.
+    - **Security & Networking**: IAM, Secret Manager, VPCs, Subnets, Firewalls.
     - **Observability**: Cloud Logging.
+    - **DevOps**: Cloud Build, Artifact Registry.
 - **🛡️ Safety**: Read-only by default for sensitive configs; confirmation dialogs for actions.
 - **📚 Documentation**:
     - [Feature Deep Dive](docs/FEATURES.md)

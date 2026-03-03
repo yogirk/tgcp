@@ -70,7 +70,7 @@ To add a new GCP service (e.g., `Cloud Spanner`):
     ```go
     {Name: "Spanner", ShortName: "spanner"},
     ```
-    Categories: Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability
+    Categories: Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability, DevOps
 
     **c. Sidebar** (`internal/ui/components/sidebar.go` → `Items` slice):
     Add in category order with a Unicode icon (see Icon Guidelines below):

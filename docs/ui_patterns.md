@@ -142,67 +142,53 @@ Toasts auto-dismiss after 3 seconds (default) or custom duration.
 
 ## Landing Page (Home Menu)
 
-The landing page displays a playful ASCII banner, user/project context, and a service menu.
+The landing page displays a playful ASCII banner, user/project context, and a fuzzy-filterable service menu.
 
-### Current Layout: Collapsible Categories
+### Current Layout: Fuzzy-Filterable Flat List
 
 ```
           ████ TGCP ████
    User: rk@...    Project: cloudside-academy
 
 ┌─ Services ─────────────────────────────┐
-│ ▸ Overview (Command Center)            │  ← Top-level item (always visible)
+│ / Filter...                            │  ← Fuzzy filter bar
 │                                        │
-│ ▼ Compute                              │  ← Category headers (collapsible)
-│     Compute Engine (GCE)               │
-│     Kubernetes Engine (GKE)            │
-│     Cloud Run                          │
-│ ▼ Storage                              │
-│     Cloud Storage (GCS)                │
-│     ...                                │
+│ ▸ Overview (Command Center)            │
+│                                        │
+│ COMPUTE                                │  ← Category headers (visual only)
+│   Compute Engine (GCE)                 │
+│   Kubernetes Engine (GKE)              │
+│   Cloud Run                            │
+│ STORAGE                                │
+│   Cloud Storage (GCS)                  │
+│   Disks                                │
+│ DATABASES                              │
+│   Cloud SQL                            │
+│   ...                                  │
+│ DEVOPS                                 │
+│   Cloud Build                          │
+│   Artifact Registry                    │
 └────────────────────────────────────────┘
+  ▼ 8 more                                ← Scroll indicator
 
-↑/↓ navigate   Space expand/collapse   Enter select   ? help   : palette
+↑/↓ navigate   / filter   Enter select   q clear filter   ? help
 ```
 
 **Structure:**
+- **Filter Bar**: Fuzzy search input at top, activated with `/`
 - **Top Item**: Overview sits above categories as the primary dashboard entry point
-- **Categories**: Collapsible groups (Compute, Storage, Databases, Data & Analytics, Security & Networking)
-- **Services**: Indented under their category, shown when expanded
-- **Collapsed state**: Shows count, e.g., `▶ Databases (4)`
+- **Category Headers**: Visual grouping labels (Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability, DevOps) — not selectable
+- **Services**: Flat list under category headers, all visible (scrollable)
+- **Scroll Indicators**: Show when more items exist above/below viewport
+
+**Categories (8):**
+Compute, Storage, Databases, Data & Analytics, Security & Networking, Observability, DevOps
 
 **Navigation:**
-- `↑/↓` or `j/k`: Move through visible items
-- `Space` or `Enter` on category: Toggle expand/collapse
-- `Enter` on service: Navigate to that service
-
-### Future: Multi-Column Layout
-
-When service count grows significantly (20+ services, new categories like AI/ML, DevOps), expand horizontally:
-
-```
-┌─ Services ──────────────────────────────────────────────────────────┐
-│ ▸ Overview (Command Center)                                         │
-│                                                                     │
-│ ▼ Compute              ▼ Databases            ▼ AI & ML            │
-│     GCE                    Cloud SQL              Vertex AI        │
-│     GKE                    Spanner                AutoML           │
-│     Cloud Run              Bigtable               Vision API       │
-│                            Memorystore                             │
-│ ▼ Storage              ▼ Data & Analytics     ▼ DevOps            │
-│     GCS                    BigQuery               Cloud Build      │
-│     Disks                  Dataflow               Artifact Reg     │
-│     Firestore              Dataproc               Cloud Deploy     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Implementation considerations:**
-1. **2D Navigation**: `←/→` switches columns, `↑/↓` moves within column
-2. **Responsive columns**: Auto-detect terminal width (1 col < 80, 2 cols < 120, 3 cols 120+)
-3. **Category placement**: Group related categories in the same row for visual coherence
-4. **Independent expansion**: Each column expands independently; others stay put
-
-**Trigger**: Implement when adding next batch of services (AI/ML, DevOps categories).
+- `↑/↓` or `j/k`: Move through service items
+- `/`: Activate fuzzy filter — type to narrow the list
+- `Enter`: Navigate to selected service
+- `q` or `Esc`: Clear active filter
 
 ## Interaction Patterns
 

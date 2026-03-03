@@ -1,6 +1,6 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-02-09
+**Analysis Date:** 2026-03-03
 
 ## Directory Layout
 
@@ -41,7 +41,9 @@ tgcp/
 │   │   ├── pubsub/               # Pub/Sub service
 │   │   ├── redis/                # Memorystore (Redis)
 │   │   ├── secrets/              # Secret Manager
-│   │   └── spanner/              # Cloud Spanner
+│   │   ├── spanner/              # Cloud Spanner
+│   │   ├── cloudbuild/           # Cloud Build
+│   │   └── artifactregistry/     # Artifact Registry
 │   ├── styles/                    # Terminal styling & colors
 │   │   └── [color definitions]   # Lipgloss style definitions
 │   ├── ui/                        # UI layer & rendering
@@ -56,7 +58,8 @@ tgcp/
 │   │       ├── filter_session.go # Generic filtering session
 │   │       ├── sidebar.go        # Service list sidebar
 │   │       ├── palette.go        # Command palette
-│   │       ├── home_menu.go      # Home page menu
+│   │       ├── home_menu.go      # Home page menu (fuzzy-filterable)
+│   │       ├── status.go         # Status indicator rendering
 │   │       ├── spinner.go        # Loading spinner
 │   │       ├── statusbar.go      # Status bar at bottom
 │   │       ├── toast.go          # Toast notifications
@@ -120,7 +123,7 @@ tgcp/
 
 **internal/services:**
 - Purpose: GCP service implementations
-- Contains: 16+ service packages, each a pluggable module implementing the Service interface
+- Contains: 21 service packages, each a pluggable module implementing the Service interface
 - Key files:
   - `interface.go` - Service interface contract (Name, InitService, Update, View, etc.)
   - `{service}/{service}.go` - Main service struct and interface implementation
@@ -337,4 +340,4 @@ No path aliases used in codebase; all imports are direct package paths.
 
 ---
 
-*Structure analysis: 2026-02-09*
+*Structure analysis: 2026-03-03*

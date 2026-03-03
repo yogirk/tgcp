@@ -56,7 +56,8 @@ Quick steps:
 1. Copy `internal/services/service_template.go.txt` as a starting point
 2. Implement the `services.Service` interface
 3. Register in `internal/ui/model.go`
-4. Add navigation command and sidebar item
+4. Add to home menu (`internal/ui/components/home_menu.go`), sidebar, and navigation
+5. Update `website/src/data/services.ts` to include the new service
 
 **Estimated time:** 2-4 hours for a basic service.
 

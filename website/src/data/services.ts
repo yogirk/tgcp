@@ -21,15 +21,14 @@ export const categories: ServiceCategory[] = [
     ],
   },
   {
-    name: 'Data',
+    name: 'Databases',
     color: 'red',
     services: [
       { name: 'Cloud SQL', description: 'Managed databases' },
-      { name: 'BigQuery', description: 'Data warehouse' },
-      { name: 'Bigtable', description: 'NoSQL wide-column' },
       { name: 'Spanner', description: 'Global relational DB' },
-      { name: 'Firestore', description: 'Document database' },
+      { name: 'Bigtable', description: 'NoSQL wide-column' },
       { name: 'Redis', description: 'In-memory cache' },
+      { name: 'Firestore', description: 'Document database' },
     ],
   },
   {
@@ -41,29 +40,30 @@ export const categories: ServiceCategory[] = [
     ],
   },
   {
-    name: 'Security',
+    name: 'Security & Networking',
     color: 'green',
     services: [
       { name: 'IAM', description: 'Identity & access' },
       { name: 'Secret Manager', description: 'Secrets vault' },
-    ],
-  },
-  {
-    name: 'Networking',
-    color: 'blue',
-    services: [
       { name: 'VPCs', description: 'Virtual networks' },
       { name: 'Subnets', description: 'Network partitions' },
       { name: 'Firewalls', description: 'Security rules' },
     ],
   },
   {
-    name: 'Analytics & Observability',
+    name: 'Data & Analytics',
     color: 'yellow',
     services: [
+      { name: 'BigQuery', description: 'Data warehouse' },
       { name: 'Pub/Sub', description: 'Messaging & events' },
       { name: 'Dataflow', description: 'Stream processing' },
       { name: 'Dataproc', description: 'Managed Spark/Hadoop' },
+    ],
+  },
+  {
+    name: 'Observability',
+    color: 'blue',
+    services: [
       { name: 'Cloud Logging', description: 'Log explorer' },
     ],
   },

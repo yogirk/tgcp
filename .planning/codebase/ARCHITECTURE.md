@@ -1,6 +1,6 @@
 # Architecture
 
-**Analysis Date:** 2026-02-09
+**Analysis Date:** 2026-03-03
 
 ## Pattern Overview
 
@@ -58,7 +58,7 @@
 2. `config.LoadConfig()` loads `~/.tgcprc` or defaults
 3. `core.Authenticate()` performs ADC check and detects project ID
 4. `core.NewServiceRegistry()` creates registry with shared cache
-5. `registerAllServices()` registers all 16+ GCP service factories
+5. `registerAllServices()` registers all 21 GCP service factories
 6. `ui.InitialModel()` creates UI model, which calls `registry.InitializeAll()` to create service instances (not initialized yet)
 7. `tea.NewProgram()` starts Bubbletea main loop
 
@@ -183,4 +183,4 @@
 
 ---
 
-*Architecture analysis: 2026-02-09*
+*Architecture analysis: 2026-03-03*

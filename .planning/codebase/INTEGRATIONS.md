@@ -1,6 +1,6 @@
 # External Integrations
 
-**Analysis Date:** 2026-02-09
+**Analysis Date:** 2026-03-03
 
 ## APIs & External Services
 
@@ -128,6 +128,19 @@
   - Features: Display cost optimization and sustainability recommendations
   - Code: `internal/services/overview/api.go`
 
+**Google Cloud Platform (DevOps):**
+- Cloud Build - CI/CD build service
+  - SDK/Client: google.golang.org/api/cloudbuild/v1
+  - Auth: ADC
+  - Features: List build triggers, view build history and status
+  - Code: `internal/services/cloudbuild/api.go`
+
+- Artifact Registry - Container and package registry
+  - SDK/Client: google.golang.org/api/artifactregistry/v1
+  - Auth: ADC
+  - Features: List repositories, browse container images and package versions
+  - Code: `internal/services/artifactregistry/api.go`
+
 **Redis:**
 - Cloud Memorystore for Redis - Managed Redis cache
   - SDK/Client: google.golang.org/api/redis/v1
@@ -253,4 +266,4 @@
 
 ---
 
-*Integration audit: 2026-02-09*
+*Integration audit: 2026-03-03*
