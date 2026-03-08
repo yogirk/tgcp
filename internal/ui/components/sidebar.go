@@ -34,6 +34,7 @@ var groupBreaks = map[int]bool{
 	14: true, // After Data & Analytics (BigQuery, Dataflow, Dataproc, Pub/Sub)
 	17: true, // After Security & Networking (IAM, Secrets, Networking)
 	18: true, // After Observability (Cloud Logging)
+	20: true, // After DevOps (Cloud Build, Artifact Registry)
 }
 
 func NewSidebar() SidebarModel {
@@ -65,6 +66,9 @@ func NewSidebar() SidebarModel {
 			{Name: "Networking", ShortName: "net", Icon: "⇄"},
 			// Observability
 			{Name: "Cloud Logging", ShortName: "logs", Icon: "☰"},
+			// DevOps
+			{Name: "Cloud Build", ShortName: "cloudbuild", Icon: "◈"},
+			{Name: "Artifact Registry", ShortName: "artifactregistry", Icon: "▣"},
 		},
 		Cursor:  0,
 		Active:  true, // Default focus on start
