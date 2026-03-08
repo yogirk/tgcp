@@ -405,13 +405,16 @@ func (s *Service) getFilteredClusters(clusters []Cluster, query string) []Cluste
 }
 
 func (s *Service) launchK9s(c Cluster) tea.Cmd {
-	return tea.ExecProcess(exec.Command("k9s", "--context", fmt.Sprintf("gke_%s_%s_%s", s.projectID, c.Location, c.Name)), func(err error) tea.Msg {
+	contextName := fmt.Sprintf("gke_%s_%s_%s", s.projectID, c.Location, c.Name)
+	return tea.ExecProcess(exec.Command("k9s", "--context", contextName), func(err error) tea.Msg {
 		if err != nil {
-			// Fallback: Try to get credentials first?
+			// Fallback: Try to get credentials first, then launch k9s.
 			// The user might not have context set up.
-			// Best effort: Run gcloud get-credentials then k9s
-			cmdStr := fmt.Sprintf("gcloud container clusters get-credentials %s --zone %s --project %s && k9s", c.Name, c.Location, s.projectID)
-			return tea.ExecProcess(exec.Command("bash", "-c", cmdStr), func(err error) tea.Msg {
+			credCmd := exec.Command("gcloud", "container", "clusters", "get-credentials", c.Name, "--zone", c.Location, "--project", s.projectID)
+			if credErr := credCmd.Run(); credErr != nil {
+				return actionResultMsg{err: fmt.Errorf("failed to get cluster credentials: %w", credErr)}
+			}
+			return tea.ExecProcess(exec.Command("k9s"), func(err error) tea.Msg {
 				if err != nil {
 					return actionResultMsg{err: err}
 				}

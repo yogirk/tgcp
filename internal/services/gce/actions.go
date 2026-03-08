@@ -3,7 +3,6 @@ package gce
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yogirk/tgcp/internal/utils"
@@ -56,12 +55,9 @@ func (s *Service) SSHCmd(instance Instance) tea.Cmd {
 	// Check for Tmux
 	if utils.IsTmux() {
 		return func() tea.Msg {
-			// Construct the full command string for tmux
-			fullCmd := fmt.Sprintf("gcloud %s", strings.Join(args, " "))
-
-			// Tmux split-window command
-			// -h for horizontal split
-			cmd := exec.Command("tmux", "split-window", "-h", fullCmd)
+			// Use -- to prevent shell interpretation of arguments
+			tmuxArgs := append([]string{"split-window", "-h", "--", "gcloud"}, args...)
+			cmd := exec.Command("tmux", tmuxArgs...)
 
 			if err := cmd.Run(); err != nil {
 				return actionResultMsg{err: fmt.Errorf("Tmux split failed: %w", err)}
