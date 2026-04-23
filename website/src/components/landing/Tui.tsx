@@ -229,7 +229,7 @@ export function TGCPTui({ autoplay = false, compact = false }: Props) {
             ? activeService.name.toLowerCase().replace(/\s+/g, '-')
             : 'services'}
         </span>
-        <span className="tui-cell">0.3.0</span>
+        <span className="tui-cell">0.4.1</span>
       </div>
 
       <div className="tui-meta">

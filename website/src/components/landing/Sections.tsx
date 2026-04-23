@@ -133,7 +133,7 @@ export function Install() {
       lines: [
         { p: '❯', text: 'brew tap yogirk/tgcp' },
         { p: '❯', text: 'brew install tgcp' },
-        { p: ' ', text: '🍺  tgcp 0.3.0 installed to /opt/homebrew/bin/tgcp', cls: 'ok' },
+        { p: ' ', text: '🍺  tgcp 0.4.1 installed to /opt/homebrew/bin/tgcp', cls: 'ok' },
       ],
     },
     {
@@ -142,7 +142,7 @@ export function Install() {
       sub: 'curl',
       lines: [
         { p: '❯', text: 'curl -L https://github.com/yogirk/tgcp/releases/latest/\\' },
-        { p: ' ', text: '    download/tgcp_0.3.0_linux_amd64.tar.gz | tar -xz' },
+        { p: ' ', text: '    download/tgcp_0.4.1_linux_amd64.tar.gz | tar -xz' },
         { p: '❯', text: 'sudo mv tgcp /usr/local/bin/' },
         { p: ' ', text: '✓  tgcp ready', cls: 'ok' },
       ],
@@ -154,7 +154,7 @@ export function Install() {
       lines: [
         { p: '❯', text: 'go install github.com/yogirk/tgcp/cmd/tgcp@latest' },
         { p: '❯', text: 'tgcp --version' },
-        { p: ' ', text: 'tgcp 0.3.0', cls: 'ok' },
+        { p: ' ', text: 'tgcp 0.4.1', cls: 'ok' },
       ],
     },
     {

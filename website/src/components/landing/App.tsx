@@ -31,7 +31,7 @@ export function App() {
           <div className="nav-brand">
             <TgcpMark />
             tgcp
-            <span className="nav-version">v0.3.0</span>
+            <span className="nav-version">v0.4.1</span>
           </div>
           <div className="nav-links">
             <a href="#features">Features</a>
@@ -71,7 +71,7 @@ export function App() {
           <div>
             <div className="hero-eyebrow">
               <span className="ping" />
-              <span>0.3.0 — now with Cloud Build & Artifact Registry</span>
+              <span>0.4.1 — Cloud Build, Artifact Registry, privacy polish</span>
             </div>
             <h1 className="hero-title">
               Your GCP,
