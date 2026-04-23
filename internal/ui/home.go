@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/styles"
@@ -80,9 +81,18 @@ func renderLandingPage(m MainModel) string {
 	banner := GetBanner()
 
 	// User Info Box
+	email := m.AuthState.UserEmail
+	if strings.Contains(email, "@") {
+		parts := strings.Split(email, "@")
+		if len(parts[0]) > 2 {
+			email = parts[0][:2] + "***@" + parts[1]
+		} else {
+			email = "***@" + parts[1]
+		}
+	}
 	userInfo := fmt.Sprintf(
 		"👤 User: %s    📁 Project: %s",
-		m.AuthState.UserEmail,
+		email,
 		m.AuthState.ProjectID,
 	)
 	infoBox := styles.PrimaryBoxStyle.Copy().

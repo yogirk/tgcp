@@ -4,7 +4,7 @@
 
 TGCP is a terminal-based user interface for observing and managing Google Cloud Platform resources, inspired by tools like K9s and TAWS. It provides a fast, keyboard-driven experience for DevOps engineers and Cloud Administrators.
 
-![TGCP Terminal Interface](image.png)
+![TGCP Terminal Interface](demo.gif)
 
 - **💡 Observability First**: Designed for reading statuses, logs, and configurations quickly.
 - **🚀 Fast Navigation**: Global vim-style keybindings (`j/k`, `Shift+H/L`).
@@ -58,6 +58,14 @@ sudo mv tgcp /usr/local/bin/
 ```
 
 Or download from the [Releases](https://github.com/yogirk/tgcp/releases) page.
+
+### Go Install
+
+Requires Go 1.21 or higher.
+
+```bash
+go install github.com/yogirk/tgcp/cmd/tgcp@latest
+```
 
 ### Build from Source
 

@@ -29,26 +29,23 @@ func InstanceToRow(i Instance) table.Row {
 		diskStr := fmt.Sprintf("%dGB", totalDisk)
 	*/
 
-	// Column Order: Name, Status, Zone, Internal IP, External IP, ID
+	// Column Order: Name, Status, Zone, Internal IP, External IP
 	return table.Row{
 		i.Name,
 		statusStr,
 		i.Zone,
 		i.InternalIP,
 		i.ExternalIP,
-		i.ID,
 	}
 }
 
 // GetGCEColumns returns the table column definitions
 func GetGCEColumns() []table.Column {
-	// Simple responsive logic can go here
 	return []table.Column{
-		{Title: "VM Name", Width: 30},
-		{Title: "VM STATE", Width: 20}, // Increased width to prevent dot-only issue
+		{Title: "VM Name", Width: 28},
+		{Title: "VM STATE", Width: 16},
 		{Title: "GCP Zone", Width: 15},
 		{Title: "Int. IP", Width: 15},
-		{Title: "Ext. IP", Width: 15},
-		{Title: "ID", Width: 20}, // Hidden or at end
+		{Title: "Ext. IP", Width: 16},
 	}
 }
