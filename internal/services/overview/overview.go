@@ -167,7 +167,7 @@ func (s *Service) fetchInfoCmd() tea.Cmd {
 func (s *Service) fetchRecsCmd() tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil {
-			return RecsMsg{}
+			return ErrMsg(fmt.Errorf("client not init"))
 		}
 
 		// Cache Check
@@ -180,7 +180,7 @@ func (s *Service) fetchRecsCmd() tea.Cmd {
 
 		recs, err := s.client.GetRecommendations(s.projectID, "")
 		if err != nil {
-			return RecsMsg{}
+			return ErrMsg(err)
 		}
 
 		// Cache Set
@@ -193,7 +193,7 @@ func (s *Service) fetchRecsCmd() tea.Cmd {
 func (s *Service) fetchInventoryCmd() tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil {
-			return InventoryMsg{}
+			return ErrMsg(fmt.Errorf("client not init"))
 		}
 
 		// Cache Check
@@ -206,7 +206,7 @@ func (s *Service) fetchInventoryCmd() tea.Cmd {
 
 		inv, err := s.client.GetGlobalInventory(s.projectID)
 		if err != nil {
-			return InventoryMsg{}
+			return ErrMsg(err)
 		}
 
 		// Cache Set
@@ -219,7 +219,7 @@ func (s *Service) fetchInventoryCmd() tea.Cmd {
 func (s *Service) fetchBudgetsCmd(billingAccountID string) tea.Cmd {
 	return func() tea.Msg {
 		if s.client == nil || billingAccountID == "" {
-			return BudgetsMsg{}
+			return ErrMsg(fmt.Errorf("client not init or missing billing id"))
 		}
 
 		cacheKey := fmt.Sprintf("billing:budgets:%s", billingAccountID)
@@ -231,7 +231,7 @@ func (s *Service) fetchBudgetsCmd(billingAccountID string) tea.Cmd {
 
 		budgets, err := s.client.GetBudgets(billingAccountID)
 		if err != nil {
-			return BudgetsMsg{}
+			return ErrMsg(err)
 		}
 
 		s.cache.Set(cacheKey, budgets, CacheTTL)

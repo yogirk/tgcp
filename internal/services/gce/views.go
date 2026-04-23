@@ -48,6 +48,7 @@ func (s *Service) renderDetailView() string {
 		Title: "Instance Details",
 		Rows: []components.KeyValue{
 			{Key: "Name", Value: i.Name},
+			{Key: "ID", Value: i.ID},
 			{Key: "Status", Value: renderStatus(i.State)},
 			{Key: "Zone", Value: i.Zone},
 			{Key: "Machine Type", Value: i.MachineType},

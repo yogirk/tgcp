@@ -51,9 +51,20 @@ func (s *Service) View() string {
 		fmt.Sprintf("Project: %s", s.projectID),
 	)
 
+	accountName := s.data.Info.BillingAccountName
+	if len(accountName) > 4 {
+		accountName = accountName[:4] + "****"
+	}
+	accountID := s.data.Info.BillingAccountID
+	if len(accountID) > 4 {
+		accountID = "****-" + accountID[len(accountID)-4:]
+	} else if accountID != "" {
+		accountID = "****"
+	}
+
 	headerRight := lipgloss.JoinVertical(lipgloss.Left,
-		fmt.Sprintf("💳 Account: %s", s.data.Info.BillingAccountName),
-		fmt.Sprintf("ID: %s", s.data.Info.BillingAccountID),
+		fmt.Sprintf("💳 Account: %s", accountName),
+		fmt.Sprintf("ID: %s", accountID),
 	)
 
 	// Top Header
