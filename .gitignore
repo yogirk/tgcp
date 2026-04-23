@@ -35,3 +35,9 @@ website/node_modules/
 website/dist/
 website/.astro/
 
+# GoReleaser local output
+/dist/
+
+# Claude Artifact bundles (one-off design references, not checked in)
+TGCP\ Landing*.html
+
