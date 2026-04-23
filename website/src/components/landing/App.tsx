@@ -13,7 +13,7 @@ export function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  const heroCmd = 'brew install tgcp';
+  const heroCmd = 'brew install yogirk/tgcp/tgcp';
   const copyHero = () => {
     navigator.clipboard
       ?.writeText(heroCmd)
