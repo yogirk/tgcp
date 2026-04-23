@@ -3,11 +3,11 @@ Output demo.gif
 Require go
 
 Set Shell "bash"
-Set FontSize 16
-Set Width 1200
+Set FontSize 14
+Set Width 1400
 Set Height 800
 Set Padding 20
-Set Theme "Catppuccin Macchiato"
+Set Theme "GitHub Dark"
 
 # Setup: ensure tgcp is built
 Hide
@@ -48,25 +48,31 @@ Sleep 3s
 Type "q"
 Sleep 1s
 
-# Show command palette and switch to bq
+# Show command palette and switch to Cloud Storage
 Type ":"
 Sleep 1s
-Type "bigquery"
+Type "gcs"
 Sleep 1s
 Enter
-Sleep 8s
+Sleep 3s
 
-# Open dataset
+# Navigate down in bucket list
 Type "j"
 Sleep 500ms
-Enter
-Sleep 8s
-
-# Open table
 Type "j"
 Sleep 500ms
+
+# Open bucket to browse objects
 Enter
-Sleep 6s
+Sleep 3s
+
+# Scroll through objects
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
 
 # Quit out
 Type "q"
