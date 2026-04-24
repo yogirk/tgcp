@@ -84,7 +84,7 @@ func (s *Service) View() string {
 	if s.data.RecsLoading {
 		insightsContent = components.InlineLoader("Loading insights...")
 	} else if len(s.data.Recommendations) == 0 {
-		insightsContent = "✅ No active recommendations found (or Recommender API disabled)."
+		insightsContent = components.EmptyState("recommendations")
 	} else {
 		// Aggregations
 		type Category struct {
@@ -185,7 +185,7 @@ func (s *Service) View() string {
 		if len(lines) > 0 {
 			insightsContent = strings.Join(lines, "\n")
 		} else {
-			insightsContent = "✅ No major cost issues found."
+			insightsContent = components.EmptyState("recommendations")
 		}
 	}
 
@@ -232,7 +232,7 @@ func (s *Service) View() string {
 	if s.data.BudgetsLoading {
 		budgetContent = components.InlineLoader("Loading budgets...")
 	} else if len(s.data.Budgets) == 0 {
-		budgetContent = "No budgets configured (or permission denied)."
+		budgetContent = components.EmptyState("budgets")
 	} else {
 		for _, b := range s.data.Budgets {
 			budgetContent += fmt.Sprintf("• %s: %s %s\n", b.Name, b.BudgetAmount, b.CurrencyCode)

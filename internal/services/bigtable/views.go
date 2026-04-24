@@ -33,6 +33,18 @@ func (s *Service) View() string {
 	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
+
+	if len(s.instances) == 0 {
+		content.WriteString(components.EmptyState("databases"))
+		return content.String()
+	}
+
+	states := make([]string, 0, len(s.instances))
+	for _, i := range s.instances {
+		states = append(states, i.State)
+	}
+	content.WriteString(components.StatusSummary(states))
+	content.WriteString("\n\n")
 	content.WriteString(s.table.View())
 	return content.String()
 }
@@ -65,7 +77,7 @@ func (s *Service) renderDetailView() string {
 	clusterContent := components.InlineLoader("Loading clusters...")
 	if s.clusters != nil {
 		if len(s.clusters) == 0 {
-			clusterContent = "No clusters found."
+			clusterContent = components.EmptyState("clusters")
 		} else {
 			var lines []string
 			for _, c := range s.clusters {

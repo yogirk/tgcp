@@ -420,7 +420,29 @@ func (s *Service) renderWithTabs() string {
 		listLabel,
 	)
 
-	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, tabs, filterBar, tableView)
+	// Status pills or empty state above the table
+	var summary string
+	if s.activeTab == TabServices {
+		if len(s.services) == 0 {
+			return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, tabs, filterBar, components.EmptyState("services"))
+		}
+		states := make([]string, 0, len(s.services))
+		for _, svc := range s.services {
+			states = append(states, string(svc.Status))
+		}
+		summary = components.StatusSummary(states) + "\n"
+	} else {
+		if len(s.functions) == 0 {
+			return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, tabs, filterBar, components.EmptyState("services"))
+		}
+		states := make([]string, 0, len(s.functions))
+		for _, f := range s.functions {
+			states = append(states, f.State)
+		}
+		summary = components.StatusSummary(states) + "\n"
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, tabs, filterBar, summary, tableView)
 }
 
 func (s *Service) renderDetailView() string {

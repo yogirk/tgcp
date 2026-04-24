@@ -90,13 +90,13 @@ func renderLandingPage(m MainModel) string {
 			email = "***@" + parts[1]
 		}
 	}
-	userInfo := fmt.Sprintf(
-		"👤 User: %s    📁 Project: %s",
+	// Muted inline info line — lets the banner and the service menu breathe
+	// without a second rounded box stacking right below the banner.
+	userInfo := styles.SubtleStyle.Render(fmt.Sprintf(
+		"👤 %s   ·   📁 %s",
 		email,
 		m.AuthState.ProjectID,
-	)
-	infoBox := styles.PrimaryBoxStyle.Copy().
-		Render(userInfo)
+	))
 
 	// Menu
 	menu := m.HomeMenu.View()
@@ -125,7 +125,7 @@ func renderLandingPage(m MainModel) string {
 	bodyParts := []string{
 		banner,
 		"\n",
-		infoBox,
+		userInfo,
 		"\n",
 		menu,
 		"\n",

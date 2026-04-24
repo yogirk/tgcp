@@ -94,6 +94,19 @@ func (s *Service) renderListView() string {
 	doc.WriteString(s.filter.View())
 	doc.WriteString("\n")
 
+	// Status summary pills above the table (only when we have data)
+	if len(s.instances) == 0 {
+		doc.WriteString(components.EmptyState("instances"))
+		return doc.String()
+	}
+
+	states := make([]string, 0, len(s.instances))
+	for _, i := range s.instances {
+		states = append(states, string(i.State))
+	}
+	doc.WriteString(components.StatusSummary(states))
+	doc.WriteString("\n\n")
+
 	doc.WriteString(styles.BaseStyle.Render(s.table.View()))
 	return doc.String()
 }

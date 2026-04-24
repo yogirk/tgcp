@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -159,6 +160,57 @@ func RenderStatusMinimal(state string) string {
 		Render(" " + displayText)
 
 	return icon + text
+}
+
+// StatusSummary renders a one-line breakdown of item statuses as inline
+// pills. Designed to sit above a list view so you get an at-a-glance sense
+// of the set: "✓ 4 Running  ·  ✗ 1 Stopped  ·  5 total".
+//
+// Only categories with a non-zero count appear. The total is always shown.
+func StatusSummary(states []string) string {
+	if len(states) == 0 {
+		return ""
+	}
+
+	counts := map[StatusCategory]int{}
+	for _, s := range states {
+		counts[CategorizeStatus(s)]++
+	}
+
+	order := []struct {
+		cat   StatusCategory
+		label string
+	}{
+		{StatusRunning, "Running"},
+		{StatusPending, "Pending"},
+		{StatusStopped, "Stopped"},
+		{StatusUnknown, "Unknown"},
+	}
+
+	var parts []string
+	for _, item := range order {
+		n := counts[item.cat]
+		if n == 0 {
+			continue
+		}
+		parts = append(parts, renderCountPill(item.cat, n, item.label))
+	}
+
+	total := styles.SubtleStyle.Render(fmt.Sprintf("%d total", len(states)))
+	parts = append(parts, total)
+
+	sep := styles.SubtleStyle.Render("  ·  ")
+	return strings.Join(parts, sep)
+}
+
+// renderCountPill formats a single "icon N label" segment with the status
+// category's accent colour.
+func renderCountPill(cat StatusCategory, count int, label string) string {
+	cfg := statusConfigs[cat]
+	icon := lipgloss.NewStyle().Foreground(cfg.background).Bold(true).Render(cfg.icon)
+	num := lipgloss.NewStyle().Foreground(styles.ColorTextPrimary).Bold(true).Render(fmt.Sprintf("%d", count))
+	lbl := lipgloss.NewStyle().Foreground(styles.ColorTextMuted).Render(label)
+	return icon + " " + num + " " + lbl
 }
 
 // shortenState shortens verbose state names for display
