@@ -10,7 +10,7 @@ Set Padding 20
 Set Theme "GitHub Dark"
 Set TypingSpeed 60ms
 
-# Build silently, then launch in demo mode — no GCP auth required
+# Build silently, launch in demo mode (no GCP auth required)
 Hide
 Type "go build -o tgcp ./cmd/tgcp"
 Enter
@@ -21,7 +21,7 @@ Type "./tgcp --demo"
 Enter
 Sleep 6s
 
-# Filter mode — cyan FILTER badge, fuzzy match
+# Filter mode — cyan FILTER badge, fuzzy match on the home menu
 Type "/"
 Sleep 500ms
 Type "bq"
@@ -37,10 +37,10 @@ Sleep 1s
 Enter
 Sleep 4s
 
-# Drill into an instance — shows detail card
-Down
+# Drill into an instance — uses vim j keys (more reliable than arrow escapes)
+Type "j"
 Sleep 400ms
-Down
+Type "j"
 Sleep 400ms
 Enter
 Sleep 4s
@@ -49,7 +49,7 @@ Sleep 4s
 Type "q"
 Sleep 1s
 
-# Jump to Bigtable — showcases the empty-state playful copy
+# Jump to Bigtable — empty-state hero shot
 Type ":"
 Sleep 600ms
 Type "bigtable"
@@ -57,20 +57,19 @@ Sleep 1s
 Enter
 Sleep 4s
 
-# Back out, open the help overlay
+# Back to home
 Type "q"
 Sleep 1s
+
+# Open help overlay (banner shows inside the dialog)
 Type "?"
 Sleep 4s
 Escape
-Sleep 1s
-
-# Return to home — let the ASCII banner hold the closing frame
-Type "q"
 Sleep 500ms
-Type "q"
+
+# Closing frame — let the ASCII banner hold the stage on the home screen
 Sleep 4s
 
-# Exit cleanly
+# Exit cleanly (single q from home closes the app)
 Type "q"
 Sleep 1s

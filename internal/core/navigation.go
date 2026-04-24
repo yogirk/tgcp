@@ -1,6 +1,8 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/sahilm/fuzzy"
 )
 
@@ -108,7 +110,17 @@ func (m *NavigationModel) RestoreBaseCommands() {
 	m.FilterCommands("")
 }
 
-// FilterCommands updates suggestions based on input query
+// FilterCommands updates suggestions based on input query.
+//
+// Ranking is a three-tier cascade so that literal matches always beat
+// loose fuzzy hits — critical for short queries like "gce" where a plain
+// fuzzy rank would float "GKE" above "GCE":
+//
+//  1. Prefix match on Name (case-insensitive)
+//  2. Substring match anywhere in Name
+//  3. Fuzzy match on "Name + Description" for everything else
+//
+// Within each tier, results preserve registration order from defaultCommands.
 func (m *NavigationModel) FilterCommands(query string) {
 	m.Query = query
 	if query == "" {
@@ -116,22 +128,68 @@ func (m *NavigationModel) FilterCommands(query string) {
 		return
 	}
 
-	// Prepare source for fuzzy search
-	sources := make([]string, len(m.Commands))
+	queryLower := strings.ToLower(query)
+	seen := make(map[int]bool, len(m.Commands))
+	var suggestions []SuggestionMatch
+
+	// Tier 1: prefix match on Name
 	for i, cmd := range m.Commands {
-		sources[i] = cmd.Name + " " + cmd.Description
+		nameLower := strings.ToLower(cmd.Name)
+		if strings.HasPrefix(nameLower, queryLower) {
+			suggestions = append(suggestions, SuggestionMatch{
+				Command:        cmd,
+				MatchedIndexes: rangeIndexes(0, len(query)),
+			})
+			seen[i] = true
+		}
 	}
 
-	matches := fuzzy.Find(query, sources)
+	// Tier 2: substring match anywhere in Name
+	for i, cmd := range m.Commands {
+		if seen[i] {
+			continue
+		}
+		nameLower := strings.ToLower(cmd.Name)
+		if idx := strings.Index(nameLower, queryLower); idx >= 0 {
+			suggestions = append(suggestions, SuggestionMatch{
+				Command:        cmd,
+				MatchedIndexes: rangeIndexes(idx, idx+len(query)),
+			})
+			seen[i] = true
+		}
+	}
 
-	m.Suggestions = make([]SuggestionMatch, 0, len(matches))
-	for _, match := range matches {
-		m.Suggestions = append(m.Suggestions, SuggestionMatch{
-			Command:        m.Commands[match.Index],
+	// Tier 3: fuzzy match on Name + Description for anything left
+	var remainingSources []string
+	var remainingOrigIdx []int
+	for i, cmd := range m.Commands {
+		if seen[i] {
+			continue
+		}
+		remainingSources = append(remainingSources, cmd.Name+" "+cmd.Description)
+		remainingOrigIdx = append(remainingOrigIdx, i)
+	}
+	for _, match := range fuzzy.Find(query, remainingSources) {
+		origIdx := remainingOrigIdx[match.Index]
+		suggestions = append(suggestions, SuggestionMatch{
+			Command:        m.Commands[origIdx],
 			MatchedIndexes: match.MatchedIndexes,
 		})
 	}
+
+	m.Suggestions = suggestions
 	m.Selection = 0 // Reset selection
+}
+
+// rangeIndexes returns a slice of sequential ints from start (inclusive) to
+// end (exclusive). Used to build MatchedIndexes for literal prefix/substring
+// hits so palette rendering highlights the matched span uniformly.
+func rangeIndexes(start, end int) []int {
+	out := make([]int, end-start)
+	for i := range out {
+		out[i] = start + i
+	}
+	return out
 }
 
 // SelectNext moves selection down
