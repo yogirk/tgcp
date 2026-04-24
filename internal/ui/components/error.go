@@ -91,7 +91,7 @@ func (m ErrorModel) View() string {
 	// Wrap in styled box
 	box := styles.OverlayBoxStyle.Copy().
 		BorderForeground(styles.ColorError).
-		Padding(1, 2).
+		Padding(styles.SpaceS, styles.SpaceM).
 		Width(80).
 		Render(content)
 

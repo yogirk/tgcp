@@ -143,7 +143,7 @@ func (m ConfirmationModel) View() string {
 	// Wrap in styled box with action-specific border color
 	dialog := styles.OverlayBoxStyle.Copy().
 		BorderForeground(style.borderColor).
-		Padding(1, 4).
+		Padding(styles.SpaceS, styles.SpaceL).
 		Width(70).
 		Render(content)
 

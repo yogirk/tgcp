@@ -155,7 +155,7 @@ func (m PaletteModel) Render(nav core.NavigationModel, screenWidth, screenHeight
 			} else {
 				// Normal
 				content = styles.UnselectedItemStyle.Copy().
-					PaddingLeft(1).
+					PaddingLeft(styles.SpaceS).
 					Render(content)
 			}
 			lines = append(lines, content)

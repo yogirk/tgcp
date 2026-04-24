@@ -34,7 +34,7 @@ func renderAuthError(m MainModel) string {
 	box := styles.OverlayBoxStyle.Copy().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(styles.ColorError).
-		Padding(1, 2).
+		Padding(styles.SpaceS, styles.SpaceM).
 		Width(60).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Center,

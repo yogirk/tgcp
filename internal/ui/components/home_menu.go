@@ -458,11 +458,8 @@ func (m HomeMenuModel) View() string {
 	// Title
 	title := styles.HeaderStyle.Render("Services")
 
-	// Category header style
-	catStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorTextMuted).
-		Bold(true).
-		PaddingLeft(1)
+	// Category header style (muted uppercase divider)
+	catStyle := styles.GroupStyle
 
 	// Visible slice
 	endIdx := m.scrollOffset + m.viewportRows
