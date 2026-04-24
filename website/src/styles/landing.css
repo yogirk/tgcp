@@ -1,11 +1,11 @@
 /* ======= TGCP landing — design tokens ======= */
 :root {
-  --bg:        #0a0a0a;
-  --bg-1:      #111111;
-  --bg-2:      #161616;
-  --panel:     #141414;
-  --border:    #242424;
-  --border-2:  #1c1c1c;
+  --bg:        #0d1117;
+  --bg-1:      #141a22;
+  --bg-2:      #1a212b;
+  --panel:     #171e27;
+  --border:    #262d38;
+  --border-2:  #1f2732;
   --fg:        #fafafa;
   --fg-2:      #cfcfcf;
   --fg-3:      #8a8a8a;
