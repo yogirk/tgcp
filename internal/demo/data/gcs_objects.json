@@ -1,0 +1,10 @@
+[
+  { "name": "builds/", "size": 0, "updatedDaysAgo": 0, "type": "Folder" },
+  { "name": "releases/", "size": 0, "updatedDaysAgo": 0, "type": "Folder" },
+  { "name": "manifests/", "size": 0, "updatedDaysAgo": 0, "type": "Folder" },
+  { "name": "CHANGELOG.md", "size": 14823, "updatedDaysAgo": 1, "type": "text/markdown" },
+  { "name": "LICENSE", "size": 11321, "updatedDaysAgo": 127, "type": "text/plain" },
+  { "name": "manifest.json", "size": 4812, "updatedDaysAgo": 2, "type": "application/json" },
+  { "name": "tgcp-darwin-arm64.tar.gz", "size": 8921034, "updatedDaysAgo": 3, "type": "application/gzip" },
+  { "name": "tgcp-linux-amd64.tar.gz", "size": 9214782, "updatedDaysAgo": 3, "type": "application/gzip" }
+]

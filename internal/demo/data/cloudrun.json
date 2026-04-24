@@ -1,0 +1,30 @@
+[
+  {
+    "name": "api-gateway",
+    "region": "us-central1",
+    "url": "https://api-gateway-a1b2c3-uc.a.run.app",
+    "status": "Ready",
+    "lastModifiedDaysAgo": 2
+  },
+  {
+    "name": "image-resizer",
+    "region": "us-central1",
+    "url": "https://image-resizer-a1b2c3-uc.a.run.app",
+    "status": "Ready",
+    "lastModifiedDaysAgo": 7
+  },
+  {
+    "name": "webhook-sink",
+    "region": "us-east1",
+    "url": "https://webhook-sink-a1b2c3-ue.a.run.app",
+    "status": "Ready",
+    "lastModifiedDaysAgo": 1
+  },
+  {
+    "name": "pdf-render",
+    "region": "europe-west1",
+    "url": "https://pdf-render-a1b2c3-ew.a.run.app",
+    "status": "Ready",
+    "lastModifiedDaysAgo": 14
+  }
+]

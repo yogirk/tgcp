@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/billingbudgets/v1"
 	"google.golang.org/api/cloudbilling/v1"
 	"google.golang.org/api/compute/v1"
@@ -27,6 +28,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	opts := []option.ClientOption{option.WithScopes(
 		cloudbilling.CloudPlatformScope,
 		"https://www.googleapis.com/auth/sqlservice.admin",
@@ -97,6 +101,11 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) GetProjectBillingInfo(projectID string) (BillingInfo, error) {
+	if demo.Enabled {
+		var info BillingInfo
+		demo.MustLoad("overview_billing", &info)
+		return info, nil
+	}
 	name := fmt.Sprintf("projects/%s", projectID)
 	info, err := c.billingService.Projects.GetBillingInfo(name).Do()
 	if err != nil {
@@ -111,6 +120,11 @@ func (c *Client) GetProjectBillingInfo(projectID string) (BillingInfo, error) {
 }
 
 func (c *Client) GetRecommendations(projectID string, zone string) ([]Recommendation, error) {
+	if demo.Enabled {
+		var recs []Recommendation
+		demo.MustLoad("overview_recommendations", &recs)
+		return recs, nil
+	}
 	var recs []Recommendation
 
 	fetch := func(recommenderID string, location string) {
@@ -168,6 +182,11 @@ func (c *Client) GetRecommendations(projectID string, zone string) ([]Recommenda
 }
 
 func (c *Client) GetBudgets(billingAccountID string) ([]SpendLimit, error) {
+	if demo.Enabled {
+		var budgets []SpendLimit
+		demo.MustLoad("overview_budgets", &budgets)
+		return budgets, nil
+	}
 	if billingAccountID == "" {
 		return nil, nil // No billing account
 	}
@@ -207,6 +226,11 @@ func (c *Client) GetBudgets(billingAccountID string) ([]SpendLimit, error) {
 
 // GetGlobalInventory fetches counts for key resources (Compute, SQL, GCS, BQ) in parallel
 func (c *Client) GetGlobalInventory(projectID string) (ResourceInventory, error) {
+	if demo.Enabled {
+		var inv ResourceInventory
+		demo.MustLoad("overview_inventory", &inv)
+		return inv, nil
+	}
 	var inv ResourceInventory
 	// var errs []error // errors ignored for partial success
 

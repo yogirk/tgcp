@@ -1,0 +1,26 @@
+[
+  {
+    "name": "tgcp-artifacts",
+    "location": "US",
+    "storageClass": "STANDARD",
+    "createdDaysAgo": 412
+  },
+  {
+    "name": "user-uploads",
+    "location": "US-CENTRAL1",
+    "storageClass": "STANDARD",
+    "createdDaysAgo": 287
+  },
+  {
+    "name": "backup-nightly",
+    "location": "US",
+    "storageClass": "NEARLINE",
+    "createdDaysAgo": 203
+  },
+  {
+    "name": "cold-archive",
+    "location": "US",
+    "storageClass": "ARCHIVE",
+    "createdDaysAgo": 598
+  }
+]

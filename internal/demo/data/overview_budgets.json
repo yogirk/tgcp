@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Engineering Monthly",
+    "budgetAmount": "5000.00",
+    "currencyCode": "USD",
+    "alertThresholds": [0.5, 0.8, 1.0]
+  },
+  {
+    "name": "Data Pipeline",
+    "budgetAmount": "1500.00",
+    "currencyCode": "USD",
+    "alertThresholds": [0.8, 1.0]
+  }
+]

@@ -1,0 +1,93 @@
+[
+  {
+    "id": "7382910458201839211",
+    "name": "prod-api-01",
+    "zone": "us-central1-a",
+    "state": "RUNNING",
+    "machineType": "n2-standard-4",
+    "internalIP": "10.0.1.14",
+    "externalIP": "34.72.148.203",
+    "createdDaysAgo": 127,
+    "tags": ["http-server", "https-server", "prod"],
+    "osImage": "debian-12-bookworm-v20240910",
+    "disks": [
+      { "name": "prod-api-01-boot", "sizeGB": 50, "type": "pd-ssd" }
+    ]
+  },
+  {
+    "id": "7382910458201839212",
+    "name": "prod-api-02",
+    "zone": "us-central1-b",
+    "state": "RUNNING",
+    "machineType": "n2-standard-4",
+    "internalIP": "10.0.1.15",
+    "externalIP": "34.72.148.210",
+    "createdDaysAgo": 127,
+    "tags": ["http-server", "https-server", "prod"],
+    "osImage": "debian-12-bookworm-v20240910",
+    "disks": [
+      { "name": "prod-api-02-boot", "sizeGB": 50, "type": "pd-ssd" }
+    ]
+  },
+  {
+    "id": "5981237401823490311",
+    "name": "worker-queue-a",
+    "zone": "us-east1-b",
+    "state": "RUNNING",
+    "machineType": "n2-standard-2",
+    "internalIP": "10.0.2.31",
+    "externalIP": "",
+    "createdDaysAgo": 43,
+    "tags": ["worker", "internal"],
+    "osImage": "ubuntu-2204-jammy-v20240912",
+    "disks": [
+      { "name": "worker-queue-a-boot", "sizeGB": 30, "type": "pd-balanced" }
+    ]
+  },
+  {
+    "id": "5981237401823490312",
+    "name": "worker-queue-b",
+    "zone": "us-east1-c",
+    "state": "RUNNING",
+    "machineType": "n2-standard-2",
+    "internalIP": "10.0.2.32",
+    "externalIP": "",
+    "createdDaysAgo": 43,
+    "tags": ["worker", "internal"],
+    "osImage": "ubuntu-2204-jammy-v20240912",
+    "disks": [
+      { "name": "worker-queue-b-boot", "sizeGB": 30, "type": "pd-balanced" }
+    ]
+  },
+  {
+    "id": "4471209384012934801",
+    "name": "batch-nightly",
+    "zone": "us-central1-f",
+    "state": "TERMINATED",
+    "machineType": "n2-highmem-8",
+    "internalIP": "10.0.3.77",
+    "externalIP": "",
+    "createdDaysAgo": 89,
+    "tags": ["batch", "nightly"],
+    "osImage": "debian-12-bookworm-v20240910",
+    "disks": [
+      { "name": "batch-nightly-boot", "sizeGB": 100, "type": "pd-ssd" },
+      { "name": "batch-nightly-data", "sizeGB": 500, "type": "pd-ssd" }
+    ]
+  },
+  {
+    "id": "9912847203947128734",
+    "name": "deploy-preview",
+    "zone": "us-west1-a",
+    "state": "PROVISIONING",
+    "machineType": "e2-medium",
+    "internalIP": "",
+    "externalIP": "",
+    "createdDaysAgo": 0,
+    "tags": ["preview", "ephemeral"],
+    "osImage": "debian-12-bookworm-v20240910",
+    "disks": [
+      { "name": "deploy-preview-boot", "sizeGB": 20, "type": "pd-standard" }
+    ]
+  }
+]

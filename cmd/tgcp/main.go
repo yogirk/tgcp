@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yogirk/tgcp/internal/config"
 	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/demo"
 	"github.com/yogirk/tgcp/internal/ui"
 	"github.com/yogirk/tgcp/internal/utils"
 )
@@ -24,6 +25,7 @@ func main() {
 	debug := flag.Bool("debug", false, "Enable debug logging")
 	project := flag.String("project", "", "Override Google Cloud project ID")
 	showVersion := flag.Bool("version", false, "Show version information")
+	demoMode := flag.Bool("demo", false, "Run with fabricated fixture data (no GCP auth required)")
 	flag.Parse()
 
 	if *showVersion {
@@ -47,15 +49,26 @@ func main() {
 		utils.Log("Error loading config: %v", err)
 	}
 
-	// 4. Authenticate
-	// Project Priority: Flag > Config > Auto-detect
-	targetProject := *project
-	if targetProject == "" {
-		targetProject = cfg.Project
+	// 4. Authenticate — or synthesize identity in demo mode.
+	var authState core.AuthState
+	if *demoMode {
+		demo.Enabled = true
+		authState = core.AuthState{
+			Authenticated: true,
+			UserEmail:     demo.FixtureUser,
+			ProjectID:     demo.FixtureProject,
+		}
+		if *debug {
+			utils.Log("Running in demo mode — fixtures only, no GCP calls")
+		}
+	} else {
+		// Project Priority: Flag > Config > Auto-detect
+		targetProject := *project
+		if targetProject == "" {
+			targetProject = cfg.Project
+		}
+		authState = core.Authenticate(context.Background(), targetProject)
 	}
-
-	// We do this synchronously for now for the MVP Foundation
-	authState := core.Authenticate(context.Background(), targetProject)
 
 	// 5. Create Version Info
 	versionInfo := core.VersionInfo{

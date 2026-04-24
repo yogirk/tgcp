@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/cloudfunctions/v2"
 	"google.golang.org/api/option"
 	run "google.golang.org/api/run/v1"
@@ -15,6 +16,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	opts := []option.ClientOption{option.WithScopes(run.CloudPlatformScope)}
 
 	svc, err := run.NewService(ctx, opts...)
@@ -31,6 +35,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListServices(projectID string) ([]RunService, error) {
+	if demo.Enabled {
+		return loadDemoRunServices(), nil
+	}
 	// List services across all locations ("-")
 	parent := fmt.Sprintf("projects/%s/locations/-", projectID)
 
