@@ -458,8 +458,14 @@ func (m HomeMenuModel) View() string {
 	// Title
 	title := styles.HeaderStyle.Render("Services")
 
-	// Category header style (muted uppercase divider)
-	catStyle := styles.GroupStyle
+	// Category header style — accent colour per category so the list has
+	// a visible rhythm as you scroll.
+	catStyleFor := func(name string) lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CategoryColor(name)).
+			Bold(true).
+			PaddingLeft(styles.SpaceS)
+	}
 
 	// Visible slice
 	endIdx := m.scrollOffset + m.viewportRows
@@ -482,15 +488,19 @@ func (m HomeMenuModel) View() string {
 	for i := startIdx; i < endIdx; i++ {
 		entry := m.filtered[i]
 		if entry.isCategory {
-			// Category header: uppercase, muted, non-selectable
-			header := catStyle.Render(strings.ToUpper(entry.categoryName))
+			// Category header: uppercase, accent-coloured, non-selectable
+			header := catStyleFor(entry.categoryName).Render(strings.ToUpper(entry.categoryName))
 			lines = append(lines, header)
 		} else if entry.service != nil {
-			// Service item
-			icon := serviceIcons[entry.service.ShortName]
-			if icon == "" {
-				icon = "·"
+			// Service item — tint the icon by category; keep the label text
+			// neutral so the list stays readable.
+			iconGlyph := serviceIcons[entry.service.ShortName]
+			if iconGlyph == "" {
+				iconGlyph = "·"
 			}
+			icon := lipgloss.NewStyle().
+				Foreground(ServiceAccent(entry.service.ShortName)).
+				Render(iconGlyph)
 			name := entry.service.Name
 			if entry.service.IsComing {
 				name += " [Coming Soon]"

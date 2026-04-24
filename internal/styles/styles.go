@@ -28,6 +28,13 @@ var (
 	ColorSurfaceHeader = lipgloss.Color("237") // Header block background
 	ColorTextOnBar     = lipgloss.Color("246") // Status bar foreground (≥4.5:1 on 235)
 
+	// Accent palette — lifted from the Google-coloured banner so the rest of
+	// the app can share the same visual register. Used to colour-code service
+	// categories and light up category headers.
+	ColorAccentRed    = lipgloss.Color("#DB4437")
+	ColorAccentYellow = lipgloss.Color("#F4B400")
+	ColorAccentGreen  = lipgloss.Color("#0F9D58")
+
 	// Base Styles
 	BaseStyle = lipgloss.NewStyle().
 			Foreground(ColorTextPrimary)

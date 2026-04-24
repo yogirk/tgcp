@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/yogirk/tgcp/internal/styles"
 )
 
@@ -160,8 +161,12 @@ func (m SidebarModel) View() string {
 	doc.WriteString("\n\n")
 
 	for i, item := range m.Items {
-		// Format: "icon name" with consistent spacing
-		displayName := item.Icon + " " + item.Name
+		// Tint the icon by category so the sidebar carries the same
+		// colour language as the home menu.
+		icon := lipgloss.NewStyle().
+			Foreground(ServiceAccent(item.ShortName)).
+			Render(item.Icon)
+		displayName := icon + " " + item.Name
 		if item.IsComing {
 			displayName += " *"
 		}
