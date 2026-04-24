@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/iterator"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	c, err := bigquery.NewClient(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bigquery client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 }
 
 func (c *Client) ListDatasets(projectID string) ([]Dataset, error) {
+	if demo.Enabled {
+		return []Dataset{}, nil
+	}
 	var datasets []Dataset
 	it := c.client.Datasets(context.Background())
 	for {
@@ -55,6 +62,9 @@ func (c *Client) ListDatasets(projectID string) ([]Dataset, error) {
 }
 
 func (c *Client) ListTables(datasetID string) ([]Table, error) {
+	if demo.Enabled {
+		return []Table{}, nil
+	}
 	var tables []Table
 	ds := c.client.Dataset(datasetID)
 	it := ds.Tables(context.Background())
@@ -101,6 +111,9 @@ func (c *Client) ListTables(datasetID string) ([]Table, error) {
 }
 
 func (c *Client) GetTableSchema(datasetID, tableID string) ([]SchemaField, error) {
+	if demo.Enabled {
+		return []SchemaField{}, nil
+	}
 	ds := c.client.Dataset(datasetID)
 	t := ds.Table(tableID)
 	md, err := t.Metadata(context.Background())

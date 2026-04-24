@@ -1,0 +1,9 @@
+{
+  "instanceCount": 6,
+  "diskCount": 8,
+  "diskGB": 830,
+  "ipCount": 3,
+  "sqlCount": 2,
+  "bucketCount": 4,
+  "datasetCount": 7
+}

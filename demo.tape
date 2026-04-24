@@ -8,76 +8,69 @@ Set Width 1400
 Set Height 800
 Set Padding 20
 Set Theme "GitHub Dark"
+Set TypingSpeed 60ms
 
-# Setup: ensure tgcp is built
+# Build silently, then launch in demo mode — no GCP auth required
 Hide
 Type "go build -o tgcp ./cmd/tgcp"
 Enter
 Sleep 2s
 Show
 
-Type "./tgcp --project cloudside-academy"
+Type "./tgcp --demo"
 Enter
-Sleep 3s
+Sleep 6s
 
-# Go to Overview
-Type "over"
+# Filter mode — cyan FILTER badge, fuzzy match
+Type "/"
+Sleep 500ms
+Type "bq"
+Sleep 2s
+Escape
+Sleep 800ms
+
+# Jump to Compute Engine via command palette
+Type ":"
+Sleep 600ms
+Type "gce"
 Sleep 1s
 Enter
 Sleep 4s
 
-# Show command palette and switch to gce
-Type ":"
+# Drill into an instance — shows detail card
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Enter
+Sleep 4s
+
+# Back to the list
+Type "q"
 Sleep 1s
-Type "gce:"
+
+# Jump to Bigtable — showcases the empty-state playful copy
+Type ":"
+Sleep 600ms
+Type "bigtable"
 Sleep 1s
 Enter
 Sleep 4s
 
-# Navigate down
-Type "j"
-Sleep 500ms
-Type "j"
-Sleep 500ms
-
-# Open instance detail
-Enter
-Sleep 3s
-
-# Go back
+# Back out, open the help overlay
 Type "q"
 Sleep 1s
-
-# Show command palette and switch to Cloud Storage
-Type ":"
+Type "?"
+Sleep 4s
+Escape
 Sleep 1s
-Type "gcs"
-Sleep 1s
-Enter
-Sleep 3s
 
-# Navigate down in bucket list
-Type "j"
-Sleep 500ms
-Type "j"
-Sleep 500ms
-
-# Open bucket to browse objects
-Enter
-Sleep 3s
-
-# Scroll through objects
-Type "j"
-Sleep 500ms
-Type "j"
-Sleep 500ms
-Type "j"
-Sleep 500ms
-
-# Quit out
+# Return to home — let the ASCII banner hold the closing frame
 Type "q"
-Sleep 1s
+Sleep 500ms
 Type "q"
-Sleep 1s
+Sleep 4s
+
+# Exit cleanly
 Type "q"
 Sleep 1s

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"cloud.google.com/go/storage"
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/iterator"
 )
 
@@ -12,6 +13,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	c, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -20,6 +24,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListBuckets(projectID string) ([]Bucket, error) {
+	if demo.Enabled {
+		return loadDemoBuckets(), nil
+	}
 	var buckets []Bucket
 	it := c.client.Buckets(context.Background(), projectID)
 	for {
@@ -41,6 +48,9 @@ func (c *Client) ListBuckets(projectID string) ([]Bucket, error) {
 }
 
 func (c *Client) ListObjects(bucket, prefix string) ([]Object, error) {
+	if demo.Enabled {
+		return loadDemoObjects(), nil
+	}
 	var objects []Object
 	it := c.client.Bucket(bucket).Objects(context.Background(), &storage.Query{
 		Prefix:    prefix,

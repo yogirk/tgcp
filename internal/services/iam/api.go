@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
@@ -16,6 +17,9 @@ type Client struct {
 
 // NewClient creates a new IAM API client
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	httpClient, err := core.NewHTTPClient(ctx, iam.CloudPlatformScope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http client: %w", err)
@@ -31,6 +35,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 // ListServiceAccounts lists all service accounts in the project
 // resource should be "projects/PROJECT_ID"
 func (c *Client) ListServiceAccounts(projectID string) ([]ServiceAccount, error) {
+	if demo.Enabled {
+		return []ServiceAccount{}, nil
+	}
 	resource := "projects/" + projectID
 	resp, err := c.service.Projects.ServiceAccounts.List(resource).Do()
 	if err != nil {

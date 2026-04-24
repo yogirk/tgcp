@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	dataflow "google.golang.org/api/dataflow/v1b3"
 )
 
@@ -12,6 +13,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := dataflow.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dataflow client: %w", err)
@@ -20,6 +24,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListJobs(projectID string) ([]Job, error) {
+	if demo.Enabled {
+		return []Job{}, nil
+	}
 	var jobs []Job
 	// Dataflow is regional, but has an aggregated list "jobs.aggregated" in v1b3?
 	// Actually projects.jobs.aggregatedList exists.

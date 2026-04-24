@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/demo"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 )
@@ -16,8 +17,13 @@ type Client struct {
 	service *compute.Service
 }
 
-// NewClient initializes a new GCE API client
+// NewClient initializes a new GCE API client.
+// In demo mode, returns a stub client; List* methods short-circuit to fixtures.
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
+
 	httpClient, err := core.NewHTTPClient(ctx, compute.ComputeScope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http client: %w", err)
@@ -32,6 +38,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 
 // ListInstances fetches all instances across all zones (AggregatedList)
 func (c *Client) ListInstances(projectID string) ([]Instance, error) {
+	if demo.Enabled {
+		return loadDemoInstances(), nil
+	}
 	req := c.service.Instances.AggregatedList(projectID)
 	var instances []Instance
 
@@ -125,12 +134,18 @@ func (c *Client) ListInstances(projectID string) ([]Instance, error) {
 
 // StartInstance starts a stopped instance
 func (c *Client) StartInstance(projectID, zone, instanceName string) error {
+	if demo.Enabled {
+		return nil
+	}
 	_, err := c.service.Instances.Start(projectID, zone, instanceName).Do()
 	return err
 }
 
 // StopInstance stops a running instance
 func (c *Client) StopInstance(projectID, zone, instanceName string) error {
+	if demo.Enabled {
+		return nil
+	}
 	_, err := c.service.Instances.Stop(projectID, zone, instanceName).Do()
 	return err
 }

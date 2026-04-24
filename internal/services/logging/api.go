@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/logging/v2"
 	"google.golang.org/api/option"
 )
@@ -35,6 +36,9 @@ type Client struct {
 
 // NewClient initializes a new Logging client using the v2 REST API
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
+    if demo.Enabled {
+        return &Client{projectID: projectID}, nil
+    }
     // Use ADC with Logging Read scope
     svc, err := logging.NewService(ctx, option.WithScopes(logging.LoggingReadScope))
     if err != nil {
@@ -59,6 +63,10 @@ func (c *Client) ListEntries(
     pageSize int,
     pageToken string,
 ) ([]LogEntry, string, error) {
+
+    if demo.Enabled {
+        return []LogEntry{}, "", nil
+    }
 
 	// If no filter is provided, we default to NO filter, relying on OrderBy to get latest.
 	// Previously we forced timestamp >= 30m ago, which hid older "latest" logs.

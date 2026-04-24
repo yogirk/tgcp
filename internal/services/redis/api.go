@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/redis/v1"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := redis.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("redis client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListInstances(projectID string) ([]Instance, error) {
+	if demo.Enabled {
+		return []Instance{}, nil
+	}
 	var instances []Instance
 	// Aggregated list works best to find across regions
 	parent := fmt.Sprintf("projects/%s/locations/-", projectID)

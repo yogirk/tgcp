@@ -1,0 +1,29 @@
+[
+  {
+    "id": "idle-vm-batch-nightly",
+    "description": "Instance 'batch-nightly' has been stopped for 14 days",
+    "recommenderSubtype": "IDLE_VM",
+    "priority": "P2",
+    "state": "ACTIVE",
+    "estimatedSavingsAmount": 48.72,
+    "currencyCode": "USD"
+  },
+  {
+    "id": "unused-ip-staging",
+    "description": "Static IP 'staging-reserved' is not attached to any resource",
+    "recommenderSubtype": "UNUSED_ADDRESS",
+    "priority": "P3",
+    "state": "ACTIVE",
+    "estimatedSavingsAmount": 7.20,
+    "currencyCode": "USD"
+  },
+  {
+    "id": "ghost-disk-legacy-2023",
+    "description": "Disk 'legacy-2023-snapshot' has been detached for 62 days (250 GiB)",
+    "recommenderSubtype": "GHOST_DISK",
+    "priority": "P2",
+    "state": "ACTIVE",
+    "estimatedSavingsAmount": 26.50,
+    "currencyCode": "USD"
+  }
+]

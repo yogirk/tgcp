@@ -3,6 +3,8 @@ package cloudrun
 import (
 	"fmt"
 	"time"
+
+	"github.com/yogirk/tgcp/internal/demo"
 )
 
 // Wrapper for Cloud Functions API
@@ -19,6 +21,9 @@ type Function struct {
 
 // ListFunctions fetches cloud functions from the project
 func (c *Client) ListFunctions(projectID string) ([]Function, error) {
+	if demo.Enabled {
+		return []Function{}, nil
+	}
 	if c.functions == nil {
 		return nil, fmt.Errorf("functions client not initialized")
 	}
