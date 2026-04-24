@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/pubsub/v1"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := pubsub.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("pubsub client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListTopics(projectID string) ([]Topic, error) {
+	if demo.Enabled {
+		return []Topic{}, nil
+	}
 	var topics []Topic
 	parent := fmt.Sprintf("projects/%s", projectID)
 
@@ -39,6 +46,9 @@ func (c *Client) ListTopics(projectID string) ([]Topic, error) {
 }
 
 func (c *Client) ListSubscriptions(projectID string) ([]Subscription, error) {
+	if demo.Enabled {
+		return []Subscription{}, nil
+	}
 	var subs []Subscription
 	parent := fmt.Sprintf("projects/%s", projectID)
 

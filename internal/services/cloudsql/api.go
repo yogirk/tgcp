@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yogirk/tgcp/internal/core"
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/option"
 	sqladmin "google.golang.org/api/sqladmin/v1beta4"
 )
@@ -16,6 +17,9 @@ type Client struct {
 
 // NewClient creates a new Cloud SQL client
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	httpClient, err := core.NewHTTPClient(ctx, sqladmin.SqlserviceAdminScope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http client: %w", err)
@@ -31,6 +35,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 
 // ListInstances fetches all Cloud SQL instances in the project
 func (c *Client) ListInstances(projectID string) ([]Instance, error) {
+	if demo.Enabled {
+		return []Instance{}, nil
+	}
 	resp, err := c.service.Instances.List(projectID).Do()
 	if err != nil {
 		return nil, fmt.Errorf("cloud sql api error: %w", err)

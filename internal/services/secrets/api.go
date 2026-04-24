@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	secretmanager "google.golang.org/api/secretmanager/v1"
 )
 
@@ -16,6 +17,9 @@ type Client struct {
 
 // NewClient creates a new Secret Manager client
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := secretmanager.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secretmanager service: %w", err)
@@ -25,6 +29,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 
 // ListSecrets returns all secrets in the project
 func (c *Client) ListSecrets(projectID string) ([]Secret, error) {
+	if demo.Enabled {
+		return []Secret{}, nil
+	}
 	parent := fmt.Sprintf("projects/%s", projectID)
 	var secrets []Secret
 
@@ -59,6 +66,9 @@ func (c *Client) ListSecrets(projectID string) ([]Secret, error) {
 
 // GetSecret returns details for a specific secret including version count
 func (c *Client) GetSecret(secretName string) (*Secret, error) {
+	if demo.Enabled {
+		return &Secret{}, nil
+	}
 	resp, err := c.service.Projects.Secrets.Get(secretName).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secret: %w", err)
@@ -82,6 +92,9 @@ func (c *Client) GetSecret(secretName string) (*Secret, error) {
 
 // ListVersions returns all versions for a secret
 func (c *Client) ListVersions(secretName string) ([]SecretVersion, error) {
+	if demo.Enabled {
+		return []SecretVersion{}, nil
+	}
 	var versions []SecretVersion
 
 	req := c.service.Projects.Secrets.Versions.List(secretName)

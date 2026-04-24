@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := compute.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("compute client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListDisks(projectID string) ([]Disk, error) {
+	if demo.Enabled {
+		return []Disk{}, nil
+	}
 	// Use aggregated list to get disks from all zones
 	req := c.service.Disks.AggregatedList(projectID)
 	var disks []Disk

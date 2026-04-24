@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	s, err := compute.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute service: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListNetworks(projectID string) ([]Network, error) {
+	if demo.Enabled {
+		return []Network{}, nil
+	}
 	var networks []Network
 	req := c.service.Networks.List(projectID)
 	if err := req.Pages(context.Background(), func(page *compute.NetworkList) error {
@@ -49,6 +56,9 @@ func (c *Client) ListNetworks(projectID string) ([]Network, error) {
 }
 
 func (c *Client) ListSubnets(projectID string, networkLink string) ([]Subnet, error) {
+	if demo.Enabled {
+		return []Subnet{}, nil
+	}
 	// Subnets are regional (AggregatedList)
 	var subnets []Subnet
 	req := c.service.Subnetworks.AggregatedList(projectID)
@@ -75,6 +85,9 @@ func (c *Client) ListSubnets(projectID string, networkLink string) ([]Subnet, er
 }
 
 func (c *Client) ListFirewalls(projectID string, networkLink string) ([]Firewall, error) {
+	if demo.Enabled {
+		return []Firewall{}, nil
+	}
 	var firewalls []Firewall
 	req := c.service.Firewalls.List(projectID)
 	req.Filter(fmt.Sprintf("network eq \"%s\"", networkLink))

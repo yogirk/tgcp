@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/container/v1"
 	"google.golang.org/api/option"
 )
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := container.NewService(ctx, option.WithScopes(container.CloudPlatformScope))
 	if err != nil {
 		return nil, fmt.Errorf("gke client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListClusters(projectID string) ([]Cluster, error) {
+	if demo.Enabled {
+		return []Cluster{}, nil
+	}
 	// Use aggregated list to get clusters from all zones/regions
 	parent := fmt.Sprintf("projects/%s/locations/-", projectID)
 	resp, err := c.service.Projects.Locations.Clusters.List(parent).Do()

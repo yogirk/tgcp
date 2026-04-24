@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/datastore/v1"
 	"google.golang.org/api/firestore/v1"
 )
@@ -15,6 +16,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	fsSvc, err := firestore.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("firestore client: %w", err)
@@ -27,6 +31,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListDatabases(projectID string) ([]Database, error) {
+	if demo.Enabled {
+		return []Database{}, nil
+	}
 	var dbs []Database
 	parent := fmt.Sprintf("projects/%s", projectID)
 
@@ -59,6 +66,9 @@ func (c *Client) ListDatabases(projectID string) ([]Database, error) {
 
 // ListNamespaces lists all namespaces in a Datastore mode database
 func (c *Client) ListNamespaces(projectID, databaseID string) ([]Namespace, error) {
+	if demo.Enabled {
+		return []Namespace{}, nil
+	}
 	var namespaces []Namespace
 
 	// Query __namespace__ kind to get all namespaces
@@ -108,6 +118,9 @@ func (c *Client) ListNamespaces(projectID, databaseID string) ([]Namespace, erro
 
 // ListKinds lists all entity kinds in a Datastore mode database namespace
 func (c *Client) ListKinds(projectID, databaseID, namespace string) ([]Kind, error) {
+	if demo.Enabled {
+		return []Kind{}, nil
+	}
 	var kinds []Kind
 
 	// Query __kind__ kind to get all entity kinds in the namespace

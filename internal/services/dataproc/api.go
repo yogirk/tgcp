@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yogirk/tgcp/internal/demo"
 	"google.golang.org/api/dataproc/v1"
 )
 
@@ -13,6 +14,9 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) (*Client, error) {
+	if demo.Enabled {
+		return &Client{}, nil
+	}
 	svc, err := dataproc.NewService(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dataproc client: %w", err)
@@ -21,6 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 func (c *Client) ListClusters(projectID string, region string) ([]Cluster, error) {
+	if demo.Enabled {
+		return []Cluster{}, nil
+	}
 	var clusters []Cluster
 
 	err := c.service.Projects.Regions.Clusters.List(projectID, region).Pages(context.Background(), func(page *dataproc.ListClustersResponse) error {
