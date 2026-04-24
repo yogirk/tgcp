@@ -13,6 +13,16 @@ TGCP (Terminal GCP Explorer) provides a comprehensive terminal interface for man
 -   **ADC Authentication**: Seamless integration with your existing `gcloud` credentials.
 -   **Version Updates**: Automatic update checking with notifications when new versions are available.
 
+## Visual Design
+
+TGCP is tuned for long sessions in a terminal: dark-first, minimal chrome, and deliberate use of colour so the eye can skim a busy screen.
+
+-   **Category Accents**: Each GCP service category (Compute, Storage, Databases, Data, Security, Observability, DevOps) has its own accent colour, lifted from the Google banner palette. Category headers on the home menu and service icons in both the home menu and sidebar are tinted accordingly, so the list has visible rhythm as you scroll.
+-   **Status Count Pills**: List views for services with a status column (GCE, Cloud Run, Bigtable) show a one-line summary above the table — `✓ 4 Running  ·  ◐ 1 Pending  ·  ✗ 1 Stopped  ·  6 total` — reusing the same colour system as the per-row status badges.
+-   **Playful Empty States**: Zero-row views render a subtle, italicised one-liner instead of a blank box (`Zero buckets. A clean canvas.`, `The logs are silent. Good news, usually.`). Messages rotate deterministically by hour-of-day so the copy varies day-to-day without feeling random within a session.
+-   **Cyan Filter Mode**: Activating `/` filter paints the status-bar mode badge cyan (informational), leaving orange reserved for genuine warnings.
+-   **WCAG-Conscious Contrast**: Status-bar foreground clears 4.5:1 over the bar background. Selection states use a single canonical `SelectedActive`/`SelectedBlur` pair across sidebar, home menu, and command palette.
+
 ## Supported Services
 
 ### Compute Engine (GCE)

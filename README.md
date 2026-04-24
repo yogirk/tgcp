@@ -4,7 +4,7 @@
 
 TGCP is a terminal-based user interface for observing and managing Google Cloud Platform resources, inspired by tools like K9s and TAWS. It provides a fast, keyboard-driven experience for DevOps engineers and Cloud Administrators.
 
-![TGCP Terminal Interface](demo.gif)
+![TGCP Terminal Interface](demo.gif?v=2)
 
 - **💡 Observability First**: Designed for reading statuses, logs, and configurations quickly.
 - **🚀 Fast Navigation**: Global vim-style keybindings (`j/k`, `Shift+H/L`).
@@ -45,19 +45,14 @@ brew upgrade tgcp
 
 ### Linux
 
-Download the latest release for your architecture:
+Pick the archive for your architecture from the [Releases](https://github.com/yogirk/tgcp/releases) page, or use this version-agnostic snippet:
 
 ```bash
-# For x86_64 (amd64)
-curl -L https://github.com/yogirk/tgcp/releases/latest/download/tgcp_0.1.0_linux_amd64.tar.gz | tar -xz
-sudo mv tgcp /usr/local/bin/
-
-# For ARM64
-curl -L https://github.com/yogirk/tgcp/releases/latest/download/tgcp_0.1.0_linux_arm64.tar.gz | tar -xz
+ARCH=amd64   # or arm64
+VERSION=$(curl -s https://api.github.com/repos/yogirk/tgcp/releases/latest | grep tag_name | cut -d'"' -f4 | tr -d 'v')
+curl -L "https://github.com/yogirk/tgcp/releases/latest/download/tgcp_${VERSION}_linux_${ARCH}.tar.gz" | tar -xz
 sudo mv tgcp /usr/local/bin/
 ```
-
-Or download from the [Releases](https://github.com/yogirk/tgcp/releases) page.
 
 ### Go Install
 
