@@ -68,7 +68,7 @@ func (m ErrorModel) View() string {
 		}
 		suggestions = lipgloss.JoinVertical(
 			lipgloss.Left,
-			styles.SubtleStyle.Render("💡 Suggestions:"),
+			styles.SubtleStyle.Render("▸ Suggestions:"),
 			strings.Join(suggestionLines, "\n"),
 		)
 	}
@@ -89,8 +89,7 @@ func (m ErrorModel) View() string {
 	)
 
 	// Wrap in styled box
-	box := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
+	box := styles.OverlayBoxStyle.Copy().
 		BorderForeground(styles.ColorError).
 		Padding(1, 2).
 		Width(80).

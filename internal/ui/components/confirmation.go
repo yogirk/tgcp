@@ -86,7 +86,7 @@ func getActionStyle(action string) actionStyle {
 	case "snapshot", "backup":
 		// Neutral actions - subtle
 		return actionStyle{
-			icon:        "📷",
+			icon:        "◱",
 			title:       "Confirm Snapshot",
 			borderColor: styles.ColorBrandAccent,
 			titleStyle:  lipgloss.NewStyle().Foreground(styles.ColorBrandAccent).Bold(true),
@@ -141,8 +141,7 @@ func (m ConfirmationModel) View() string {
 	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
 
 	// Wrap in styled box with action-specific border color
-	dialog := styles.BoxStyle.Copy().
-		Border(lipgloss.RoundedBorder()).
+	dialog := styles.OverlayBoxStyle.Copy().
 		BorderForeground(style.borderColor).
 		Padding(1, 4).
 		Width(70).

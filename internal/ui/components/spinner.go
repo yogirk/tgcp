@@ -151,12 +151,10 @@ func (m SpinnerModel) ViewCentered(width, height int) string {
 	)
 }
 
-// --- Legacy compatibility functions ---
-// These are kept for backwards compatibility but now just return static text.
-// Services should transition to using the centralized spinner in MainModel.
-
-// RenderSpinner returns a static loading indicator (deprecated - use MainModel spinner)
-func RenderSpinner(message string) string {
+// InlineLoader returns a static, single-line loading indicator intended for
+// inline use inside detail cards or sections while an async subfield loads.
+// Use SpinnerModel for full-page loading states.
+func InlineLoader(message string) string {
 	if message == "" {
 		message = "Loading..."
 	}

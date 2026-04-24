@@ -171,10 +171,10 @@ func (m SidebarModel) View() string {
 		var renderedItem string
 		if isSelected {
 			if m.Active {
-				renderedItem = styles.SelectedItemStyle.Render(displayName)
+				renderedItem = styles.SelectedActive.Render(displayName)
 			} else {
-				// Selected but not focused (dimmed)
-				renderedItem = styles.UnselectedItemStyle.Copy().Foreground(styles.ColorBrandAccent).Render(displayName)
+				// Selected but not focused (muted accent, no bar)
+				renderedItem = styles.SelectedBlur.Render(displayName)
 			}
 		} else {
 			style := styles.UnselectedItemStyle

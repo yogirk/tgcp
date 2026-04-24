@@ -82,7 +82,7 @@ func (s *Service) View() string {
 	// 2. Actionable Insights
 	var insightsContent string
 	if s.data.RecsLoading {
-		insightsContent = components.RenderSpinner("Loading insights...")
+		insightsContent = components.InlineLoader("Loading insights...")
 	} else if len(s.data.Recommendations) == 0 {
 		insightsContent = "✅ No active recommendations found (or Recommender API disabled)."
 	} else {
@@ -230,7 +230,7 @@ func (s *Service) View() string {
 	// 4. Budgets
 	var budgetContent string
 	if s.data.BudgetsLoading {
-		budgetContent = components.RenderSpinner("Loading budgets...")
+		budgetContent = components.InlineLoader("Loading budgets...")
 	} else if len(s.data.Budgets) == 0 {
 		budgetContent = "No budgets configured (or permission denied)."
 	} else {
