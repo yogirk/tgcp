@@ -67,12 +67,13 @@ func (m StatusBarModel) View() string {
 
 	modeLabel := m.Mode
 	if m.IsError {
-		modeStyle = modeStyle.Background(lipgloss.Color("196")) // Red
+		modeStyle = modeStyle.Background(styles.ColorError)
 		modeLabel = "ERROR"
 	} else if m.Mode == "COMMAND" {
 		modeStyle = modeStyle.Background(styles.ColorBrandPrimary)
 	} else if m.Mode == "FILTER" {
-		modeStyle = modeStyle.Background(styles.ColorWarning)
+		// Filtering is informational, not a warning
+		modeStyle = modeStyle.Background(styles.ColorInfo)
 	} else if m.FocusPane == "MAIN" {
 		modeStyle = modeStyle.Background(styles.ColorBrandAccent)
 		modeLabel = m.FocusPane

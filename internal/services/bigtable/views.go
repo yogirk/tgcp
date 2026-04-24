@@ -62,7 +62,7 @@ func (s *Service) renderDetailView() string {
 	})
 
 	// Clusters
-	clusterContent := components.RenderSpinner("Loading clusters...")
+	clusterContent := components.InlineLoader("Loading clusters...")
 	if s.clusters != nil {
 		if len(s.clusters) == 0 {
 			clusterContent = "No clusters found."

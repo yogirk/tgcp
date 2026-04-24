@@ -7,9 +7,9 @@ import (
 
 func renderAuthError(m MainModel) string {
 	errTitle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("196")). // Red
+		Foreground(styles.ColorError).
 		Bold(true).
-		Render("⚠️  Authentication Error ⚠️")
+		Render("⚠ Authentication Error ⚠")
 
 	errMsg := ""
 	if m.AuthState.Error != nil {
@@ -31,10 +31,10 @@ func renderAuthError(m MainModel) string {
  Press 'q' to quit.
 `
 
-	box := styles.BoxStyle.Copy().
+	box := styles.OverlayBoxStyle.Copy().
 		Border(lipgloss.DoubleBorder()).
-		BorderForeground(lipgloss.Color("196")).
-		Padding(1, 2).
+		BorderForeground(styles.ColorError).
+		Padding(styles.SpaceS, styles.SpaceM).
 		Width(60).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Center,

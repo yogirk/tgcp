@@ -458,11 +458,8 @@ func (m HomeMenuModel) View() string {
 	// Title
 	title := styles.HeaderStyle.Render("Services")
 
-	// Category header style
-	catStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorTextMuted).
-		Bold(true).
-		PaddingLeft(1)
+	// Category header style (muted uppercase divider)
+	catStyle := styles.GroupStyle
 
 	// Visible slice
 	endIdx := m.scrollOffset + m.viewportRows
@@ -503,12 +500,12 @@ func (m HomeMenuModel) View() string {
 			isSelected := i == cursorFilteredIdx
 
 			if isSelected {
-				rendered := styles.SelectedItemStyle.Copy().UnsetBorderLeft().Render("▸ " + display)
+				rendered := styles.SelectedActive.Render(display)
 				lines = append(lines, rendered)
 			} else {
-				style := styles.UnselectedItemStyle.Copy().PaddingLeft(2)
+				style := styles.UnselectedItemStyle
 				if entry.service.IsComing {
-					style = style.Foreground(styles.ColorTextMuted)
+					style = style.Copy().Foreground(styles.ColorTextMuted)
 				}
 				lines = append(lines, style.Render(display))
 			}
@@ -537,9 +534,7 @@ func (m HomeMenuModel) View() string {
 
 	// Fixed-height box so the menu doesn't grow beyond the viewport
 	boxHeight := m.viewportRows + 8 // items + title(1) + gaps(2) + filter(1) + padding(2) + borders(2)
-	menuBox := styles.BoxStyle.Copy().
-		BorderForeground(styles.ColorBrandAccent).
-		Padding(1, 2).
+	menuBox := styles.PrimaryBoxStyle.Copy().
 		Height(boxHeight).
 		Render(content)
 
