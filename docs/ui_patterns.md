@@ -6,6 +6,8 @@ This document outlines the standard UI patterns, colors, and components used in 
 
 TGCP uses a semantic color system defined in `internal/styles/styles.go`. Avoid using raw hex codes in views; always use the exported Lipgloss colors.
 
+### Brand & Semantic
+
 | Semantic Name | Description | Use Case |
 | :--- | :--- | :--- |
 | `ColorBrandPrimary` | GCP Blue | Main titles, primary focus rings, key branding. |
@@ -13,34 +15,76 @@ TGCP uses a semantic color system defined in `internal/styles/styles.go`. Avoid 
 | `ColorTextPrimary` | Near White | Standard body text. |
 | `ColorTextMuted` | Muted Grey | Secondary text, labels, inactive states. |
 | `ColorSuccess` | Green | "RUNNING", "HEALTHY", success messages. |
-| `ColorWarning` | Orange | "STOPPED", "PENDING", warning alerts. |
+| `ColorWarning` | Orange | Genuine warnings (reserved — do not use for mode badges). |
 | `ColorError` | Red | "ERROR", "FAILED", critical alerts. |
-| `ColorBorderSubtle` | Dark Grey | Panels borders, dividers. |
+| `ColorInfo` | Cyan | Informational mode badges (FILTER), info toasts. |
+| `ColorBorderSubtle` | Dark Grey | Panel borders, dividers. |
+
+### Accent Palette (lifted from the banner)
+
+| Semantic Name | Description | Use Case |
+| :--- | :--- | :--- |
+| `ColorAccentRed` | Google Red | Databases / Storage category tint. |
+| `ColorAccentYellow` | Google Yellow | Compute / Security category tint. |
+| `ColorAccentGreen` | Google Green | DevOps category tint. |
+
+Categories map to accents in `internal/ui/components/category.go`. Use `CategoryColor(name)` or `ServiceAccent(shortName)` to look up a tint — do not hardcode.
+
+### Surfaces
+
+| Semantic Name | Description | Use Case |
+| :--- | :--- | :--- |
+| `ColorSurfaceBar` | #235 | Status bar background. |
+| `ColorSurfaceHeader` | #237 | Header-block background (page titles). |
+| `ColorTextOnBar` | #246 | Status bar foreground (≥4.5:1 over `ColorSurfaceBar`). |
 
 ## Typography
 
--   **Headings**: Bold, `ColorBrandPrimary`. Use `TitleStyle`.
--   **Labels**: Bold, `ColorTextMuted`. Use `LabelStyle`.
--   **Values**: Regular, `ColorTextPrimary`. Use `ValueStyle`.
+TGCP uses a three-tier header scale — one rule per tier:
+
+| Style | Tier | Use Case |
+| :--- | :--- | :--- |
+| `HeaderStyle` | Page | Solid bar with background fill. Page-level titles, detail-card header bar. |
+| `SectionStyle` | Section | Bold, brand accent. Card titles, in-box section headings. `TitleStyle` is an alias. |
+| `GroupStyle` | Group | Muted uppercase dividers for list groups and categories. |
+
+Body text uses `LabelStyle` (muted, bold) for keys and `ValueStyle` (primary text) for values.
 
 ## Border Hierarchy
 
-TGCP uses a two-tier border system to create visual hierarchy:
+TGCP uses a three-tier border system:
 
 | Style | Use Case | Visual |
 | :--- | :--- | :--- |
-| `PrimaryBoxStyle` | Main content (detail cards, modals) | Rounded border, accent color (#75), more padding |
-| `SecondaryBoxStyle` | Supporting content (hints, sections) | Normal border, subtle grey (#240), less padding |
+| `PrimaryBoxStyle` | Main content cards, active panels | Rounded border, brand accent (#75) |
+| `SecondaryBoxStyle` | Supporting content (metadata sections) | Normal border, subtle grey (#240) |
+| `OverlayBoxStyle` | Modals, dialogs, dropdowns | Rounded border, caller-supplied accent colour |
 
 ```go
-// Main content - prominent
+// Main content — prominent
 styles.PrimaryBoxStyle.Render(mainContent)
 
-// Supporting content - subtle
-styles.SecondaryBoxStyle.Render(hints)
+// Supporting content — subtle
+styles.SecondaryBoxStyle.Render(metadata)
+
+// Overlay — caller recolors the border per action
+styles.OverlayBoxStyle.Copy().BorderForeground(styles.ColorError).Render(errorDialog)
 ```
 
-This ensures users can quickly identify the primary focus area vs. supporting information.
+## Spacing Scale
+
+Reference `styles.SpaceXS` / `SpaceS` / `SpaceM` / `SpaceL` (0, 1, 2, 4) instead of raw padding literals. Keeps rhythm consistent across screens.
+
+## Selection States
+
+Two canonical states for any list row (sidebar, home menu, command palette):
+
+| Style | When |
+| :--- | :--- |
+| `SelectedActive` | Row is selected AND its list has focus. Bold brand accent, left border bar. |
+| `SelectedBlur` | Row is selected but focus is elsewhere. Brand accent foreground, no bar. |
+
+Do not hand-roll selection styling per component — consistency comes from these two tokens.
 
 ## Standard Components
 
@@ -56,6 +100,8 @@ Resource lists should use `StandardTable` (`internal/ui/components/table.go`).
 -   **Selection (Focused)**: Dark grey background (#236), blue accent text (#39), bold.
 -   **Selection (Blurred)**: Lighter grey background (#240), muted text (#245).
 -   **Status Column**: Use `components.RenderStatus()` for badge-style indicators.
+-   **Summary Pills**: Render `components.StatusSummary(states)` above the table to give readers an at-a-glance breakdown before they scan rows. Empty categories are omitted; total is always shown.
+-   **Empty Row Sets**: When the list is empty, render `components.EmptyState("<resource-type>")` instead of leaving the area blank.
 
 ### 3. Detail Views
 Use `DetailCard` (`internal/ui/components/detail.go`) for consistent styling.
@@ -140,6 +186,31 @@ Toast types:
 
 Toasts auto-dismiss after 3 seconds (default) or custom duration.
 
+### 9. Status Summary Pills
+Sits above a list view to give readers an at-a-glance breakdown of status distribution.
+
+```go
+states := make([]string, 0, len(instances))
+for _, i := range instances {
+    states = append(states, string(i.State))
+}
+summary := components.StatusSummary(states)
+// Renders: ✓ 4 Running  ·  ◐ 1 Pending  ·  ✗ 1 Stopped  ·  6 total
+```
+
+Pills reuse the colour system from `RenderStatus()` so per-row badges and the summary stay in visual lockstep.
+
+### 10. Empty States
+Render a subtle italic one-liner instead of a blank box when a list has zero rows.
+
+```go
+if len(instances) == 0 {
+    return components.EmptyState("instances")
+}
+```
+
+Message pools live in `internal/ui/components/empty.go`, keyed by resource type (`"instances"`, `"buckets"`, `"clusters"`, `"databases"`, `"logs"`, `"recommendations"`, `"budgets"`, ...). Unknown keys fall back to the `"default"` pool. Messages rotate deterministically by hour-of-day so the copy varies day-to-day without changing within a session.
+
 ## Landing Page (Home Menu)
 
 The landing page displays a playful ASCII banner, user/project context, and a fuzzy-filterable service menu.
@@ -147,32 +218,38 @@ The landing page displays a playful ASCII banner, user/project context, and a fu
 ### Current Layout: Fuzzy-Filterable Flat List
 
 ```
-          ████ TGCP ████
-   User: rk@...    Project: cloudside-academy
+          ████ TGCP ████                   ← ASCII banner (brand moment)
+   👤 rk@...   ·   📁 cloudside-academy    ← Muted inline identity line
 
 ┌─ Services ─────────────────────────────┐
 │ / Filter...                            │  ← Fuzzy filter bar
 │                                        │
-│ ▸ Overview (Command Center)            │
+│   Overview (Command Center)            │  ← Top item (selected row = accent bar)
 │                                        │
-│ COMPUTE                                │  ← Category headers (visual only)
-│   Compute Engine (GCE)                 │
-│   Kubernetes Engine (GKE)              │
-│   Cloud Run                            │
+│ COMPUTE                                │  ← Category header (category colour)
+│   ⚙  Compute Engine (GCE)              │  ← Service icons tinted by category
+│   ☸  Kubernetes Engine (GKE)           │
+│   ▷  Cloud Run                         │
 │ STORAGE                                │
-│   Cloud Storage (GCS)                  │
-│   Disks                                │
+│   ▤  Cloud Storage (GCS)               │
+│   ◔  Disks                             │
 │ DATABASES                              │
-│   Cloud SQL                            │
+│   ⛁  Cloud SQL                         │
 │   ...                                  │
 │ DEVOPS                                 │
-│   Cloud Build                          │
-│   Artifact Registry                    │
+│   ◈  Cloud Build                       │
+│   ▣  Artifact Registry                 │
 └────────────────────────────────────────┘
   ▼ 8 more                                ← Scroll indicator
 
 ↑/↓ navigate   / filter   Enter select   q clear filter   ? help
 ```
+
+**Visual notes:**
+- The identity line is rendered inline (no box) so the banner and the menu breathe.
+- Category headers use `GroupStyle` tinted with `CategoryColor(name)`.
+- Service icons are tinted with `ServiceAccent(shortName)` — the label text stays neutral for readability.
+- The selected row uses `SelectedActive` (left accent bar); no `▸` prefix.
 
 **Structure:**
 - **Filter Bar**: Fuzzy search input at top, activated with `/`
