@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { TGCP_SERVICES } from './services';
 import { TgcpMark } from './Mark';
+import { TGCP_VERSION } from './constants';
 
 function Section({
   id,
@@ -133,7 +134,7 @@ export function Install() {
       lines: [
         { p: '❯', text: 'brew tap yogirk/tgcp' },
         { p: '❯', text: 'brew install tgcp' },
-        { p: ' ', text: '🍺  tgcp 0.4.1 installed to /opt/homebrew/bin/tgcp', cls: 'ok' },
+        { p: ' ', text: `🍺  tgcp ${TGCP_VERSION} installed to /opt/homebrew/bin/tgcp`, cls: 'ok' },
       ],
     },
     {
@@ -142,7 +143,7 @@ export function Install() {
       sub: 'curl',
       lines: [
         { p: '❯', text: 'curl -L https://github.com/yogirk/tgcp/releases/latest/\\' },
-        { p: ' ', text: '    download/tgcp_0.4.1_linux_amd64.tar.gz | tar -xz' },
+        { p: ' ', text: `    download/tgcp_${TGCP_VERSION}_linux_amd64.tar.gz | tar -xz` },
         { p: '❯', text: 'sudo mv tgcp /usr/local/bin/' },
         { p: ' ', text: '✓  tgcp ready', cls: 'ok' },
       ],
@@ -154,7 +155,7 @@ export function Install() {
       lines: [
         { p: '❯', text: 'go install github.com/yogirk/tgcp/cmd/tgcp@latest' },
         { p: '❯', text: 'tgcp --version' },
-        { p: ' ', text: 'tgcp 0.4.1', cls: 'ok' },
+        { p: ' ', text: `tgcp ${TGCP_VERSION}`, cls: 'ok' },
       ],
     },
     {

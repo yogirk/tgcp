@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TGCPTui } from './Tui';
 import { Features, ServiceMatrix, Install, Footer } from './Sections';
 import { TgcpMark } from './Mark';
+import { TGCP_VERSION, RELEASE_TAGLINE } from './constants';
 
 type Theme = 'dark' | 'light';
 
@@ -31,7 +32,7 @@ export function App() {
           <div className="nav-brand">
             <TgcpMark />
             tgcp
-            <span className="nav-version">v0.4.1</span>
+            <span className="nav-version">v{TGCP_VERSION}</span>
           </div>
           <div className="nav-links">
             <a href="#features">Features</a>
@@ -71,7 +72,7 @@ export function App() {
           <div>
             <div className="hero-eyebrow">
               <span className="ping" />
-              <span>0.4.1 — Cloud Build, Artifact Registry, privacy polish</span>
+              <span>{RELEASE_TAGLINE}</span>
             </div>
             <h1 className="hero-title">
               Your GCP,
