@@ -245,7 +245,7 @@ tgcp/
    - `views.go`: (optional) Rendering logic if complex
 3. Register in `internal/ui/model.go`: `registerAllServices()` function
 4. Add command to palette in `internal/core/navigation.go`: `defaultCommands()` function
-5. **Update website**: Add service to `website/src/data/services.ts` (and update `website/src/components/Hero.astro` TUI preview if category structure changes)
+5. **Update website**: Add the service to `website/src/components/landing/services.ts` (`TGCP_SERVICES`). If the new service has a canonical fixture at `internal/demo/data/<service>.json`, wire an adapter in `website/src/components/landing/fixtures.ts` so the hero TUI mock renders real data; otherwise the `_default` fallback table shows.
 
 **New UI Component:**
 1. Create file: `internal/ui/components/{component}.go`
@@ -279,12 +279,14 @@ tgcp/
 - Structure: Each service is independent; can be added/removed without affecting others
 
 **website/:**
-- Purpose: Landing page at https://yogirk.github.io/tgcp
-- Stack: Astro 5 + Tailwind CSS v4 (dark-mode only, terminal aesthetic)
-- Key data file: `src/data/services.ts` — must stay in sync with TUI service catalog
-- Key components: Hero (TUI preview), Services (tree view), Install (3 methods)
-- GitHub stars fetched at build time in `src/components/Header.astro`
-- Deployed to GitHub Pages with base path `/tgcp`
+- Purpose: Landing page at https://tgcp.yogirk.dev
+- Stack: Astro 5 + Tailwind CSS v4 + React (dark/light themes, terminal aesthetic)
+- Key data files:
+  - `src/components/landing/services.ts` — TGCP_SERVICES list; must stay in sync with TUI service catalog
+  - `src/components/landing/fixtures.ts` — adapts shared JSON under `internal/demo/data/*.json` into table rows for the hero TUI mock; single source of truth with `--demo` mode
+  - `src/components/landing/constants.ts` — TGCP_VERSION, DEMO_USER, DEMO_PROJECT, RELEASE_TAGLINE; bump here on release
+- Key components: App (top-level), Tui (interactive TUI mock), Sections (Features, ServiceMatrix, Install, Footer), Mark (logo)
+- Deployed to GitHub Pages, served via custom domain (CNAME) with base path `/`
 - Generated: No (hand-maintained)
 - Committed: Yes
 

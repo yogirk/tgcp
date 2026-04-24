@@ -56,8 +56,9 @@ Quick steps:
 1. Copy `internal/services/service_template.go.txt` as a starting point
 2. Implement the `services.Service` interface
 3. Register in `internal/ui/model.go`
-4. Add to home menu (`internal/ui/components/home_menu.go`), sidebar, and navigation
-5. Update `website/src/data/services.ts` to include the new service
+4. Add to home menu (`internal/ui/components/home_menu.go`), sidebar, `groupBreaks`, and category mapping (`internal/ui/components/category.go`) — 5 locations total; see the Developer Guide for the full checklist
+5. Wire a demo-mode stub in the service's `api.go` (short-circuit `List*`/`Get*` when `demo.Enabled`); optionally drop a JSON fixture at `internal/demo/data/`
+6. Update `website/src/components/landing/services.ts` (TGCP_SERVICES) so the landing page's service matrix matches
 
 **Estimated time:** 2-4 hours for a basic service.
 
@@ -71,7 +72,7 @@ Quick steps:
 
 ## Common Patterns
 
-- Use shared components: `components.RenderError()`, `components.RenderSpinner()`, `components.RenderConfirmation()`
+- Use shared components: `components.RenderError()`, `components.InlineLoader()` (inline loaders inside cards) or `SpinnerModel` (full-page loading), `components.RenderConfirmation()`, `components.StatusSummary()` (count pills), `components.EmptyState(resourceType)` (zero-row views)
 - Always use `StandardTable` for tables
 - Follow `docs/ui_patterns.md` for breadcrumbs, filters, and detail layout decisions
 - Implement proper caching with TTL

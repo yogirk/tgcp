@@ -67,8 +67,7 @@
 - Google Sans Code - Terminal/code blocks (self-hosted woff2)
 
 **Deployment:**
-- GitHub Pages at `https://yogirk.github.io/tgcp` (base path: `/tgcp`)
-- GitHub stars count fetched at build time via GitHub REST API
+- GitHub Pages, served at `https://tgcp.yogirk.dev` (custom domain via `website/public/CNAME`, base path `/`)
 
 ## Configuration
 
