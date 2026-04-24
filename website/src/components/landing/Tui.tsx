@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TGCP_SERVICES, FAKE_RESOURCES, type Service } from './services';
+import { TGCP_VERSION, DEMO_USER, DEMO_PROJECT, DEMO_REGION } from './constants';
 
 type ListItem =
   | { type: 'header'; label: string; _i: string }
@@ -229,18 +230,18 @@ export function TGCPTui({ autoplay = false, compact = false }: Props) {
             ? activeService.name.toLowerCase().replace(/\s+/g, '-')
             : 'services'}
         </span>
-        <span className="tui-cell">0.4.1</span>
+        <span className="tui-cell">{TGCP_VERSION}</span>
       </div>
 
       <div className="tui-meta">
         <span>
-          <span className="tui-muted">user</span> user@company.com
+          <span className="tui-muted">user</span> {DEMO_USER}
         </span>
         <span>
-          <span className="tui-muted">project</span> my-gcp-project
+          <span className="tui-muted">project</span> {DEMO_PROJECT}
         </span>
         <span>
-          <span className="tui-muted">region</span> us-central1
+          <span className="tui-muted">region</span> {DEMO_REGION}
         </span>
       </div>
 
