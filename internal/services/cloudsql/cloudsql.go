@@ -306,7 +306,7 @@ func (s *Service) View() string {
 		return s.renderConfirmation()
 	}
 
-	// Filter Bar
+	// Default: List View
 	var content strings.Builder
 	content.WriteString(components.Breadcrumb(
 		fmt.Sprintf("Project %s", s.projectID),
@@ -316,6 +316,20 @@ func (s *Service) View() string {
 	content.WriteString("\n")
 	content.WriteString(s.filter.View())
 	content.WriteString("\n")
+
+	if len(s.instances) == 0 {
+		content.WriteString(components.EmptyState("instances"))
+		return content.String()
+	}
+
+	// Status Summary (Count pills)
+	states := make([]string, 0, len(s.instances))
+	for _, inst := range s.instances {
+		states = append(states, string(inst.State))
+	}
+	content.WriteString(components.StatusSummary(states))
+	content.WriteString("\n\n")
+
 	content.WriteString(s.table.View())
 	return content.String()
 }
