@@ -132,7 +132,7 @@ export function Install() {
       label: 'macOS',
       sub: 'Homebrew',
       lines: [
-        { p: '❯', text: 'brew tap yogirk/tgcp' },
+        { p: '❯', text: 'brew tap yogirk/tap' },
         { p: '❯', text: 'brew install tgcp' },
         { p: ' ', text: `🍺  tgcp ${TGCP_VERSION} installed to /opt/homebrew/bin/tgcp`, cls: 'ok' },
       ],

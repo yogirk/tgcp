@@ -34,7 +34,7 @@ TGCP is a terminal-based user interface for observing and managing Google Cloud 
 ### macOS (Homebrew)
 
 ```bash
-brew tap yogirk/tgcp
+brew tap yogirk/tap
 brew install tgcp
 ```
 

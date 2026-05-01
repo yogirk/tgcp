@@ -43,7 +43,8 @@ changelog:
 brews:
   - repository:
       owner: yogirk
-      name: homebrew-tgcp
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/yogirk/tgcp"
     description: "Terminal UI for Google Cloud Platform"
     license: "MIT"
